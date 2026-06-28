@@ -1,0 +1,10 @@
+{
+  "name": "success-brand-hub",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "astro build"
+  },
+  "dependencies": {
+    "astro": "^4.0.0"
+  }
+}
