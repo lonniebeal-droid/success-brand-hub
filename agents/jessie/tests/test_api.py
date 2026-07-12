@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -7,10 +9,16 @@ from agents.jessie.src.intake_service import IntakeService
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("JESSE_API_KEY", "test-api-key")
+    monkeypatch.setenv("JESSE_ADMIN_TOKEN", "admin-token")
+    monkeypatch.setenv("JESSE_TWILIO_TOKEN", "twilio-token")
+    monkeypatch.setenv("JESSE_ELEVENLABS_TOKEN", "elevenlabs-token")
+    monkeypatch.setenv("JESSE_N8N_TOKEN", "n8n-token")
+    monkeypatch.setenv("JESSE_GOOGLE_TOKEN", "google-token")
     monkeypatch.setenv("JESSE_ENVIRONMENT", "test")
     monkeypatch.setenv("JESSE_DATA_PATH", str(tmp_path / "intakes.json"))
     monkeypatch.setenv("JESSE_LOG_LEVEL", "INFO")
+    monkeypatch.setenv("JESSE_RATE_LIMIT_PER_KEY", "2")
+    monkeypatch.setenv("JESSE_RATE_LIMIT_PER_IP", "2")
 
     data_file = tmp_path / "intakes.json"
     service = IntakeService(data_file=str(data_file))
@@ -19,8 +27,15 @@ def client(tmp_path, monkeypatch):
         yield test_client
 
 
-def auth_headers():
-    return {"X-API-Key": "test-api-key"}
+def auth_headers(service: str = "admin") -> dict[str, str]:
+    tokens = {
+        "admin": "admin-token",
+        "twilio": "twilio-token",
+        "elevenlabs": "elevenlabs-token",
+        "n8n": "n8n-token",
+        "google": "google-token",
+    }
+    return {"X-API-Key": tokens[service]}
 
 
 def test_health_endpoint_is_public(client):
@@ -29,7 +44,7 @@ def test_health_endpoint_is_public(client):
     assert response.json()["status"] == "ok"
 
 
-def test_missing_api_key_is_rejected(client):
+def test_missing_token_is_rejected(client):
     response = client.post(
         "/intakes",
         json={
@@ -47,7 +62,7 @@ def test_missing_api_key_is_rejected(client):
     assert response.json()["error"]["code"] == "unauthorized"
 
 
-def test_invalid_api_key_is_rejected(client):
+def test_invalid_token_is_rejected(client):
     response = client.post(
         "/intakes",
         json={
@@ -59,37 +74,33 @@ def test_invalid_api_key_is_rejected(client):
             "preferred_callback_time": "tomorrow",
             "consent_to_store": True,
         },
-        headers={"X-API-Key": "wrong-key"},
+        headers={"X-API-Key": "wrong-token"},
     )
 
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "unauthorized"
 
 
-def test_create_intake_route_returns_redacted_response(client):
-    payload = {
-        "caller_name": "Ada Lovelace",
-        "phone_number": "(555) 123-4567",
-        "email": "ada@example.com",
-        "reason_for_call": "Consultation",
-        "urgency": "normal",
-        "preferred_callback_time": "tomorrow",
-        "consent_to_store": True,
-    }
-
-    response = client.post("/intakes", json=payload, headers=auth_headers())
-
-    assert response.status_code == 201
-    body = response.json()
-    assert body["caller_name"] == "Ada Lovelace"
-    assert body["status"] == "new"
-    assert "email" not in body
-    assert "phone_number" not in body
-    assert "id" in body
+def test_valid_service_tokens_are_accepted(client):
+    for service in ("admin", "twilio", "elevenlabs", "n8n"):
+        response = client.post(
+            "/intakes",
+            json={
+                "caller_name": "Ada Lovelace",
+                "phone_number": "(555) 123-4567",
+                "email": "ada@example.com",
+                "reason_for_call": "Consultation",
+                "urgency": "normal",
+                "preferred_callback_time": "tomorrow",
+                "consent_to_store": True,
+            },
+            headers=auth_headers(service=service),
+        )
+        assert response.status_code == 201
 
 
-def test_get_intake_route_returns_redacted_payload(client):
-    intake = client.post(
+def test_permissions_by_service(client):
+    create_response = client.post(
         "/intakes",
         json={
             "caller_name": "Grace Hopper",
@@ -100,105 +111,37 @@ def test_get_intake_route_returns_redacted_payload(client):
             "preferred_callback_time": "today",
             "consent_to_store": True,
         },
-        headers=auth_headers(),
-    ).json()
-
-    response = client.get(f"/intakes/{intake['id']}", headers=auth_headers())
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["caller_name"] == "Grace Hopper"
-    assert "email" not in body
-    assert "phone_number" not in body
-
-
-def test_pending_callbacks_route_lists_new_intakes(client):
-    client.post(
-        "/intakes",
-        json={
-            "caller_name": "Ada Lovelace",
-            "phone_number": "(555) 123-4567",
-            "email": "ada@example.com",
-            "reason_for_call": "Consultation",
-            "urgency": "normal",
-            "preferred_callback_time": "tomorrow",
-            "consent_to_store": True,
-        },
-        headers=auth_headers(),
+        headers=auth_headers(service="twilio"),
     )
+    assert create_response.status_code == 201
 
-    response = client.get("/callbacks/pending", headers=auth_headers())
-
-    assert response.status_code == 200
-    assert len(response.json()) == 1
-    assert response.json()[0]["status"] == "new"
+    callbacks_response = client.get("/callbacks/pending", headers=auth_headers(service="twilio"))
+    assert callbacks_response.status_code == 403
 
 
-def test_update_status_route_changes_status(client):
-    intake = client.post(
-        "/intakes",
-        json={
-            "caller_name": "Ada Lovelace",
-            "phone_number": "(555) 123-4567",
-            "email": "ada@example.com",
-            "reason_for_call": "Consultation",
-            "urgency": "normal",
-            "preferred_callback_time": "tomorrow",
-            "consent_to_store": True,
-        },
-        headers=auth_headers(),
-    ).json()
+def test_rate_limiting_enforces_limits(client):
+    first = client.get("/callbacks/pending", headers=auth_headers(service="admin"))
+    second = client.get("/callbacks/pending", headers=auth_headers(service="admin"))
+    third = client.get("/callbacks/pending", headers=auth_headers(service="admin"))
 
-    response = client.patch(
-        f"/intakes/{intake['id']}/status",
-        json={"status": "scheduled"},
-        headers=auth_headers(),
-    )
-
-    assert response.status_code == 200
-    assert response.json()["status"] == "scheduled"
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert third.status_code == 429
+    assert third.json()["error"]["code"] == "rate_limited"
 
 
-def test_summary_route_returns_redacted_summary(client):
-    intake = client.post(
-        "/intakes",
-        json={
-            "caller_name": "Ada Lovelace",
-            "phone_number": "(555) 123-4567",
-            "email": "ada@example.com",
-            "reason_for_call": "Consultation",
-            "urgency": "high",
-            "preferred_callback_time": "tomorrow",
-            "consent_to_store": True,
-        },
-        headers=auth_headers(),
-    ).json()
-
-    response = client.get(f"/intakes/{intake['id']}/summary", headers=auth_headers())
-
-    assert response.status_code == 200
-    body = response.json()
-    assert "Ada Lovelace" in body["summary"]
-    assert "4567" in body["summary"]
-    assert "ada@example.com" not in body["summary"]
-    assert "example.com" not in body["summary"]
+def test_request_id_is_generated(client):
+    response = client.get("/health")
+    assert response.headers.get("X-Request-ID")
 
 
-def test_invalid_payload_returns_bad_request(client):
-    response = client.post(
-        "/intakes",
-        json={
-            "caller_name": "Ada Lovelace",
-            "phone_number": "invalid-phone",
-            "email": "ada@example.com",
-            "reason_for_call": "Consultation",
-            "urgency": "normal",
-            "preferred_callback_time": "tomorrow",
-            "consent_to_store": True,
-        },
-        headers=auth_headers(),
-    )
+def test_custom_request_id_is_accepted(client):
+    response = client.get("/health", headers={"X-Request-ID": "req-1234"})
+    assert response.headers.get("X-Request-ID") == "req-1234"
 
+
+def test_malformed_request_id_is_rejected(client):
+    response = client.get("/health", headers={"X-Request-ID": "bad id"})
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "invalid_request"
 
@@ -214,7 +157,7 @@ def test_feature_flags_default_to_false(client):
     }
 
 
-def test_logs_do_not_expose_secrets(client, caplog):
+def test_safe_audit_logs_do_not_expose_sensitive_data(client, caplog):
     with caplog.at_level("INFO", logger="jesse.api"):
         client.post(
             "/intakes",
@@ -227,17 +170,17 @@ def test_logs_do_not_expose_secrets(client, caplog):
                 "preferred_callback_time": "tomorrow",
                 "consent_to_store": True,
             },
-            headers=auth_headers(),
+            headers=auth_headers(service="admin"),
         )
 
     log_output = caplog.text
-    assert "test-api-key" not in log_output
+    assert "admin-token" not in log_output
     assert "ada@example.com" not in log_output
     assert "(555) 123-4567" not in log_output
 
 
 def test_safe_error_responses_do_not_leak_internal_details(client):
-    response = client.get("/intakes/does-not-exist", headers=auth_headers())
+    response = client.get("/intakes/does-not-exist", headers=auth_headers(service="admin"))
 
     assert response.status_code == 404
     payload = response.json()

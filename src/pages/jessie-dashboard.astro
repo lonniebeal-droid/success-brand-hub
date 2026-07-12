@@ -1,0 +1,59 @@
+---
+const apiUrl = import.meta.env.JESSE_API_URL || 'http://127.0.0.1:8000';
+const cards = [
+  ['API health', 'Not connected', 'Start the local FastAPI service to populate live development metrics.'],
+  ['Total intakes', '—', 'No caller data is embedded in this page or its build output.'],
+  ['Pending callbacks', '—', 'Read-only dashboard access is planned through a server-side proxy.'],
+  ['Integration mode', 'Mock', 'Every external adapter defaults to disabled with zero network activity.'],
+];
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Jesse Development Dashboard</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background:#07111f; color:#eef6ff; }
+      body { margin:0; min-height:100vh; background:radial-gradient(circle at top right,#15345d 0,transparent 35%),#07111f; }
+      main { width:min(1100px,calc(100% - 32px)); margin:auto; padding:48px 0 72px; }
+      .warning { display:inline-flex; gap:8px; align-items:center; padding:8px 12px; border:1px solid #f7b95566; border-radius:999px; color:#ffd58a; background:#f7b95512; font-size:.8rem; font-weight:800; letter-spacing:.08em; }
+      h1 { margin:20px 0 8px; font-size:clamp(2rem,7vw,4.5rem); line-height:.95; }
+      .lede { max-width:720px; color:#a9bdd4; font-size:1.05rem; line-height:1.65; }
+      .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin:36px 0; }
+      .card,.panel { border:1px solid #b9d7ff20; border-radius:18px; background:#0d1b2dcc; box-shadow:0 18px 60px #0004; }
+      .card { padding:22px; }
+      .label { color:#83a2c4; font-size:.78rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
+      .value { display:block; margin:12px 0; font-size:1.65rem; font-weight:800; }
+      .card p,.muted { color:#91a7bf; line-height:1.5; margin:0; }
+      .panel { padding:24px; margin-top:16px; }
+      .status { display:flex; justify-content:space-between; gap:16px; padding:13px 0; border-bottom:1px solid #b9d7ff18; }
+      .status:last-child { border:0; }
+      .pill { color:#86efac; font-weight:750; }
+      code { color:#b7d7ff; word-break:break-all; }
+      @media (max-width:560px){ main{padding-top:28px}.status{display:block}.pill{display:block;margin-top:6px} }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span class="warning">⚠ DEVELOPMENT ONLY</span>
+      <h1>Jesse sandbox</h1>
+      <p class="lede">A safe operations view for the local Jesse intake platform. This page ships with empty and offline states only; it never exposes service tokens or claims that a real call, message, booking, or workflow occurred.</p>
+      <section class="grid" aria-label="Development metrics">
+        {cards.map(([label,value,description]) => <article class="card"><span class="label">{label}</span><strong class="value">{value}</strong><p>{description}</p></article>)}
+      </section>
+      <section class="panel">
+        <h2>System status</h2>
+        <div class="status"><span>API endpoint</span><code>{apiUrl}</code></div>
+        <div class="status"><span>Dashboard state</span><span class="pill">Offline-safe</span></div>
+        <div class="status"><span>External integrations</span><span class="pill">Disabled</span></div>
+        <div class="status"><span>Recent summaries</span><span class="muted">Empty — no development records loaded</span></div>
+      </section>
+      <section class="panel">
+        <h2>Integration health</h2>
+        {['Twilio','ElevenLabs','Google Calendar','Google Sheets','Gmail','n8n'].map(name => <div class="status"><span>{name}</span><span class="muted">Disabled · mock adapter available</span></div>)}
+      </section>
+    </main>
+  </body>
+</html>

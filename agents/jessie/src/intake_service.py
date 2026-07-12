@@ -1,9 +1,10 @@
-import json
 import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from agents.jessie.src.storage import LocalJSONStorage, StorageAdapter, StorageError
 
 
 class IntakeValidationError(ValueError):
@@ -11,27 +12,17 @@ class IntakeValidationError(ValueError):
 
 
 class IntakeService:
-    def __init__(self, data_file: Optional[str] = None):
+    def __init__(self, data_file: Optional[str] = None, storage: Optional[StorageAdapter] = None):
         self.data_file = Path(data_file or "agents/jessie/data/intakes.json")
         self.data_file.parent.mkdir(parents=True, exist_ok=True)
-        self._records: List[Dict[str, Any]] = []
-        self._load()
+        self.storage: StorageAdapter = storage or LocalJSONStorage(self.data_file)
+        self._records: List[Dict[str, Any]] = self.storage.load_records()
 
     def _load(self) -> None:
-        if self.data_file.exists():
-            try:
-                payload = json.loads(self.data_file.read_text(encoding="utf-8"))
-                if isinstance(payload, list):
-                    self._records = payload
-                else:
-                    self._records = []
-            except json.JSONDecodeError:
-                self._records = []
-        else:
-            self._records = []
+        self._records = self.storage.load_records()
 
     def _save(self) -> None:
-        self.data_file.write_text(json.dumps(self._records, indent=2), encoding="utf-8")
+        self.storage.write_records(self._records)
 
     def create_intake(
         self,
@@ -64,8 +55,8 @@ class IntakeService:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "status": "new",
         }
-        self._records.append(intake)
-        self._save()
+        self.storage.create_record(intake)
+        self._records = self.storage.load_records()
         return intake
 
     def retrieve_intake(self, intake_id: str) -> Optional[Dict[str, Any]]:
@@ -81,7 +72,7 @@ class IntakeService:
         for record in self._records:
             if record.get("id") == intake_id:
                 record["status"] = status.strip()
-                self._save()
+                self.storage.write_records(self._records)
                 return record
         raise LookupError(f"Intake {intake_id} not found")
 

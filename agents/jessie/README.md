@@ -69,13 +69,29 @@ Jesse AI is the SuccessBrand AI receptionist and client-intake agent. Jesse hand
 - Escalate suspicious, urgent, or high-risk situations according to the safety plan.
 
 ## Status
-Documentation foundation for Jesse AI v1 completed. Local intake code is implemented in agents/jessie/src and tested under agents/jessie/tests. External integrations are not connected, and production status is not live.
+Documentation foundation for Jesse AI v1 completed. Local intake code is implemented in agents/jessie/src and tested under agents/jessie/tests. The sandbox API now exposes mock-only integration routes, local reporting endpoints, and a CLI workflow while keeping all external connections disabled by default.
 
 ## Implementation Status
 - Documentation complete: Yes
 - Local intake code implemented: Yes
-- External integrations connected: No
+- Mock-only sandbox integrations implemented: Yes
+- Reporting endpoints implemented: Yes
+- CLI workflow implemented: Yes
 - Production status: Not live
+
+## Sandbox Capabilities
+- Mock Twilio inbound-call handling
+- Mock ElevenLabs transcript intake
+- Mock Google Calendar slot lookup and booking
+- Mock Google Sheets intake export
+- Mock Gmail follow-up sending
+- Mock N8N event delivery
+- Local reporting for daily, summary, integration, security, and system health views
+
+## Usage
+- Run the CLI via python -m agents.jessie.cli create-intake ...
+- Hit /health, /integrations/status, and /reports/summary in the local FastAPI app
+- Keep all external integrations disabled unless explicitly enabled in environment variables
 
 ## Future Roadmap
 - Voice intake workflow
