@@ -26,8 +26,8 @@ success-brand-hub/
 ├── agents/
 │   ├── jessie/
 │   ├── successbrand/
-│   ├── receptionist/
-│   ├── landlord/
+│   ├── ju/
+│   ├── michelle/
 │   └── sales/
 │
 ├── automation/

@@ -10,6 +10,7 @@ Sections to include:
 
 - System Components
   - Agent orchestration layer
+  - Active agents include Ju, Michelle, Sales, Research, Finance, Operations, and SuccessBrand
   - Integrations (Gmail, Drive, Calendar, ElevenLabs, Gemini, Twilio)
   - Storage and knowledge base
   - Web / UI components

@@ -1,25 +1,3 @@
 name: michelle
-role: operations-manager
-description: Michelle coordinates execution, assignments, deadlines, and cross-agent operations for Success Brand Hub.
-status: starter
-owner: success-brand-hub
-responsibilities:
-  - manage projects
-  - assign work to agents
-  - track deadlines
-  - monitor github progress
-  - coordinate ju jessie ceo sales research and content agents
-  - maintain project memory
-  - produce daily operational reports
-connected_agents:
-  - ceo
-  - jessie
-  - ju
-  - sales
-  - research
-  - content
-  - operations
-memory_file: memory.md
-prompt_file: prompt.md
-tasks_file: tasks.md
-tools_file: tools.md
+description: Michelle agent configuration
+version: 1.0

@@ -1,28 +1,3 @@
 name: ju
-role: executive-orchestrator
-description: Ju coordinates AI agents, manages business priorities, and guides strategic execution for Success Brand Hub.
-status: starter
-owner: success-brand-hub
-responsibilities:
-  - coordinate ai agents
-  - delegate specialist work
-  - track long-term goals
-  - manage priorities
-  - monitor project status
-  - provide strategic recommendations
-  - maintain business memory
-primary_focus:
-  - orchestration
-  - strategy
-  - governance
-connected_agents:
-  - michelle
-  - jessie
-  - sales
-  - landlord
-  - content
-  - automation
-memory_file: memory.md
-prompt_file: prompt.md
-tasks_file: tasks.md
-tools_file: tools.md
+description: Ju agent configuration
+version: 1.0
