@@ -1,0 +1,34 @@
+agent_name: jessie
+version: 1.0.0
+role: receptionist_and_client_intake
+status: planned
+environment: development
+memory_enabled: true
+scheduling_enabled: false
+crm_enabled: false
+sms_enabled: false
+email_enabled: false
+transfer_enabled: false
+reporting_enabled: false
+connected_agents:
+  - ju
+  - michelle
+  - sales
+  - operations
+required_integrations:
+  - elevenlabs
+  - twilio
+  - google_calendar
+  - gmail
+  - google_sheets
+  - n8n
+  - gemini
+  - chatgpt
+  - github
+placeholder_identifiers:
+  business_hours: "PLACEHOLDER_BUSINESS_HOURS"
+  calendar_id: "PLACEHOLDER_CALENDAR_ID"
+  crm_sheet_id: "PLACEHOLDER_SHEET_ID"
+  phone_number: "PLACEHOLDER_PHONE_NUMBER"
+  api_key: "PLACEHOLDER_API_KEY"
+  workflow_url: "PLACEHOLDER_WORKFLOW_URL"
