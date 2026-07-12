@@ -1,5 +1,9 @@
 # Architecture
 
+## Core platform runtime
+
+Success Brand Hub now includes shared discovery, messaging, memory, and REST API services under `core/`. Ju provides executive routing, delegation, events, memory, and reporting. Michelle provides task, project, workflow, notification, status, and escalation services. See `docs/core-platform-architecture.md` for component boundaries and current limitations.
+
 High-level architecture placeholder for Success Brand Hub.
 
 Sections to include:

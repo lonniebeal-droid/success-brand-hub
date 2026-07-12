@@ -1,0 +1,19 @@
+---
+const agents = [
+  ['Jesse','Ready','Intake API and secure sandbox'],
+  ['Ju','Ready','Orchestration and delegation runtime'],
+  ['Michelle','Ready','Tasks, projects, workflows, escalation'],
+  ['Sales','Planned','Lead and pipeline operations'],
+  ['Content','Planned','Campaign and media production'],
+  ['Automation','Planned','Workflow operations'],
+  ['Finance','Planned','Financial operations'],
+  ['Workspace','Planned','Google Workspace operations'],
+];
+---
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width"/><meta name="robots" content="noindex,nofollow"/><title>Success Brand Executive Dashboard</title>
+<style>
+:root{font-family:Inter,system-ui,sans-serif;color:#f3f7ff;background:#06101d}body{margin:0;background:radial-gradient(circle at 80% 0,#173d65,transparent 38%),#06101d}main{width:min(1180px,calc(100% - 32px));margin:auto;padding:42px 0 72px}.eyebrow{color:#79b8ff;font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:.76rem}h1{font-size:clamp(2.3rem,7vw,5rem);line-height:.95;margin:14px 0}.lede{color:#99adc4;max-width:720px;line-height:1.6}.summary,.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:15px;margin-top:28px}.card{border:1px solid #bdd9ff20;border-radius:18px;padding:20px;background:#0c1a2ccc;box-shadow:0 16px 45px #0005}.metric{font-size:2rem;font-weight:850;display:block;margin-top:9px}.agent{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.agent h2{font-size:1.1rem;margin:0 0 7px}.agent p{color:#91a6bd;margin:0;font-size:.9rem;line-height:1.45}.pill{border-radius:99px;padding:6px 9px;font-size:.72rem;font-weight:800}.ready{color:#8df0b2;background:#23c76619}.planned{color:#ffd590;background:#ffb84d18}@media(max-width:540px){main{padding-top:28px}.agent{display:block}.pill{display:inline-block;margin-top:12px}}</style></head>
+<body><main><span class="eyebrow">Success Brand Hub · Development</span><h1>Executive command center</h1><p class="lede">A read-only operational view of agent readiness, runtime health, and work queues. No credentials, caller data, or production controls are exposed.</p>
+<section class="summary"><article class="card"><span>Registered agents</span><strong class="metric">{agents.length}</strong></article><article class="card"><span>Active runtimes</span><strong class="metric">3</strong></article><article class="card"><span>Open tasks</span><strong class="metric">0</strong></article><article class="card"><span>Platform health</span><strong class="metric">Ready</strong></article></section>
+<section class="grid">{agents.map(([name,status,description])=><article class="card agent"><div><h2>{name}</h2><p>{description}</p></div><span class:list={['pill',status.toLowerCase()]}>{status}</span></article>)}</section>
+</main></body></html>
