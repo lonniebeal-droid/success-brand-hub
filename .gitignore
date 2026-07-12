@@ -16,3 +16,6 @@ coverage.xml
 agents/jessie/data/
 agents/*/data/
 core/data/
+*.db
+*.db-shm
+*.db-wal

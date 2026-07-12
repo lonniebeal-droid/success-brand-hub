@@ -1,0 +1,6 @@
+---
+const sections = ["Users", "Roles", "Permissions", "Logs", "Queues", "Memory", "Settings", "API Keys", "Feature Flags"];
+---
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Success Brand Admin</title><style>
+:root{font-family:Inter,system-ui;background:#07111f;color:#eef5ff}body{margin:0;padding:32px}.wrap{max-width:1100px;margin:auto}.warning{color:#fbbf24}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}.card{background:#10213a;border:1px solid #284263;border-radius:16px;padding:20px}.muted{color:#9fb0c7}.pill{display:inline-block;background:#17345b;color:#7dd3fc;padding:4px 10px;border-radius:999px;font-size:12px}a{color:#7dd3fc}@media(max-width:600px){body{padding:18px}}
+</style></head><body><main class="wrap"><p class="pill">STAGING ONLY</p><h1>Platform Administration</h1><p class="warning">No production credentials or live integrations are available here.</p><div class="grid">{sections.map((name)=><section class="card"><h2>{name}</h2><p class="muted">Secure staging controls and read-only operational visibility for {name.toLowerCase()}.</p><span class="pill">JWT protected API</span></section>)}</div><p><a href="/executive-dashboard">Executive dashboard</a></p></main></body></html>

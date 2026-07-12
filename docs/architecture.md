@@ -37,3 +37,6 @@ Sections to include:
 
 Next steps:
 - Produce component diagrams, sequence flows, and a more detailed component spec.
+# Platform v2 staging layer
+
+Platform v2 adds SQLite persistence, role-based JWT authentication, persistent task processing, agent heartbeats, monitoring, durable memory, local scheduling, notification records, and protected REST controls around the completed Jesse, Ju, and Michelle work. The executive and admin dashboards are staging-only views. Live Twilio, ElevenLabs, Google, n8n, email, and SMS behavior remains disabled, and production deployment is unchanged.
