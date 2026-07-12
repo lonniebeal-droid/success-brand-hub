@@ -1,0 +1,12 @@
+agent:
+  name: "Finance"
+  slug: "finance"
+  status: "planned"
+  active: false
+  reports_to: "michelle"
+  hierarchy:
+    - ceo
+    - ju
+    - michelle
+    - finance
+  notes: "Scaffolded documentation only. Not yet operational."

@@ -1,0 +1,12 @@
+agent:
+  name: "Content"
+  slug: "content"
+  status: "planned"
+  active: false
+  reports_to: "michelle"
+  hierarchy:
+    - ceo
+    - ju
+    - michelle
+    - content
+  notes: "Scaffolded documentation only. Not yet operational."
