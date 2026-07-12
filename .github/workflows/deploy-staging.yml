@@ -1,0 +1,49 @@
+name: Deploy Jesse staging
+
+on:
+  workflow_run:
+    workflows: ["Jesse tests and build"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Commit SHA that already passed tests
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  staging:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      TARGET_SHA: ${{ inputs.commit_sha || github.event.workflow_run.head_sha }}
+      JESSE_ELEVENLABS_API_KEY: ${{ secrets.JESSE_ELEVENLABS_API_KEY }}
+      JESSE_ELEVENLABS_STAGING_AGENT_ID: ${{ secrets.JESSE_ELEVENLABS_STAGING_AGENT_ID }}
+      JESSE_TWILIO_ACCOUNT_SID: ${{ secrets.JESSE_TWILIO_ACCOUNT_SID }}
+      JESSE_TWILIO_AUTH_TOKEN: ${{ secrets.JESSE_TWILIO_AUTH_TOKEN }}
+      JESSE_TWILIO_STAGING_NUMBER: ${{ secrets.JESSE_TWILIO_STAGING_NUMBER }}
+      JESSE_N8N_BASE_URL: ${{ secrets.JESSE_N8N_BASE_URL }}
+      JESSE_N8N_API_KEY: ${{ secrets.JESSE_N8N_API_KEY }}
+      JESSE_N8N_STAGING_WORKFLOW_ID: ${{ secrets.JESSE_N8N_STAGING_WORKFLOW_ID }}
+      JESSE_GOOGLE_CREDENTIALS_JSON: ${{ secrets.JESSE_GOOGLE_CREDENTIALS_JSON }}
+      JESSE_GOOGLE_STAGING_CALENDAR_ID: ${{ secrets.JESSE_GOOGLE_STAGING_CALENDAR_ID }}
+      JESSE_GOOGLE_STAGING_SHEET_ID: ${{ secrets.JESSE_GOOGLE_STAGING_SHEET_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Validate staging deployment plan
+        run: python -m agents.jessie.cli deploy-staging --commit-sha "$TARGET_SHA"
+      - name: Record summary
+        run: |
+          echo '## Jesse staging deployment' >> "$GITHUB_STEP_SUMMARY"
+          echo "Validated commit: \\`$TARGET_SHA\\`" >> "$GITHUB_STEP_SUMMARY"
+          echo 'External actions: disabled in v1 adapter' >> "$GITHUB_STEP_SUMMARY"

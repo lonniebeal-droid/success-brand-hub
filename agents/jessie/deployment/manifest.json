@@ -1,0 +1,15 @@
+{
+  "application_version": "1.0.0-sandbox",
+  "commit_sha": "UNDEPLOYED",
+  "environment": "development",
+  "deployed_timestamp": null,
+  "elevenlabs_agent_version": null,
+  "twilio_configuration_version": null,
+  "n8n_workflow_version": null,
+  "google_configuration_version": null,
+  "previous_known_good_version": null,
+  "rollback_target": null,
+  "staging_status": "not_deployed",
+  "production_status": "not_deployed",
+  "last_test_result": "not_recorded"
+}

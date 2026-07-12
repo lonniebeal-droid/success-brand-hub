@@ -1,0 +1,31 @@
+name: Roll back Jesse
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Known-good commit SHA to restore
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  rollback-approval:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Validate rollback
+        run: python -m agents.jessie.cli rollback --commit-sha "${{ inputs.target_sha }}" --confirm-production
+      - name: Rollback summary
+        run: |
+          echo '## Jesse rollback event' >> "$GITHUB_STEP_SUMMARY"
+          echo "Approved rollback target: \\`${{ inputs.target_sha }}\\`" >> "$GITHUB_STEP_SUMMARY"
+          echo 'External action remains disabled in the v1 adapter.' >> "$GITHUB_STEP_SUMMARY"

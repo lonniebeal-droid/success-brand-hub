@@ -1,0 +1,5 @@
+environment: staging
+deployment_mode: staging
+external_actions_enabled: false
+approval_required: true
+resources: placeholders-from-github-secrets

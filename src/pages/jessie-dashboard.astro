@@ -6,6 +6,15 @@ const cards = [
   ['Pending callbacks', '—', 'Read-only dashboard access is planned through a server-side proxy.'],
   ['Integration mode', 'Mock', 'Every external adapter defaults to disabled with zero network activity.'],
 ];
+const deployment = {
+  version: '1.0.0-sandbox',
+  commit: 'UNDEPLOYED',
+  staging: 'Not deployed',
+  production: 'Not deployed',
+  lastTest: 'Not recorded',
+  previous: 'None',
+  rollback: 'Unavailable',
+};
 ---
 
 <html lang="en">
@@ -53,6 +62,16 @@ const cards = [
       <section class="panel">
         <h2>Integration health</h2>
         {['Twilio','ElevenLabs','Google Calendar','Google Sheets','Gmail','n8n'].map(name => <div class="status"><span>{name}</span><span class="muted">Disabled · mock adapter available</span></div>)}
+      </section>
+      <section class="panel">
+        <h2>Deployment status</h2>
+        <div class="status"><span>Current version</span><code>{deployment.version}</code></div>
+        <div class="status"><span>Current commit</span><code>{deployment.commit}</code></div>
+        <div class="status"><span>Staging</span><span class="muted">{deployment.staging}</span></div>
+        <div class="status"><span>Production</span><span class="muted">{deployment.production}</span></div>
+        <div class="status"><span>Last test</span><span class="muted">{deployment.lastTest}</span></div>
+        <div class="status"><span>Previous known good</span><span class="muted">{deployment.previous}</span></div>
+        <div class="status"><span>Rollback</span><span class="muted">{deployment.rollback}</span></div>
       </section>
     </main>
   </body>
