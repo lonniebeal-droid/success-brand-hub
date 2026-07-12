@@ -69,7 +69,13 @@ Jesse AI is the SuccessBrand AI receptionist and client-intake agent. Jesse hand
 - Escalate suspicious, urgent, or high-risk situations according to the safety plan.
 
 ## Status
-Documentation foundation for Jesse AI v1 completed. No live voice-agent configuration or production integration is implied.
+Documentation foundation for Jesse AI v1 completed. Local intake code is implemented in agents/jessie/src and tested under agents/jessie/tests. External integrations are not connected, and production status is not live.
+
+## Implementation Status
+- Documentation complete: Yes
+- Local intake code implemented: Yes
+- External integrations connected: No
+- Production status: Not live
 
 ## Future Roadmap
 - Voice intake workflow
