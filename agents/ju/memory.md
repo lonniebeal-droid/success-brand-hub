@@ -1,18 +1,51 @@
 # Ju Memory
 
-This file stores strategic and executive context for Success Brand Hub.
+This file stores persistent executive context for Success Brand Hub.
 
-## Executive Memory Template
-- Company Vision:
-- Current Strategic Focus:
-- Priority Initiatives:
-- Approved Roadmap Items:
-- Decision Log:
-- Risks and Tradeoffs:
-- Next Executive Action:
-- Last Updated:
+## Active Projects
+- Project Name:
+- Owner:
+- Priority:
+- Status:
+- Deadline:
+- Current Focus:
+- Key Dependencies:
+
+## Business Goals
+- Short-Term Goals:
+- Medium-Term Goals:
+- Long-Term Goals:
+- Success Metrics:
+
+## Team Members
+- Michelle:
+- Jessie:
+- Sales:
+- Landlord:
+- Content:
+- Automation:
+- Notes:
+
+## Decisions
+- Decision:
+- Rationale:
+- Date:
+- Follow-Up:
+
+## Long-Term Memory
+- Mission Alignment:
+- Historical Context:
+- Strategic Lessons:
+- Repeated Challenges:
+
+## Pending Tasks
+- Task:
+- Assigned To:
+- Priority:
+- Due Date:
+- Status:
 
 ## Current Notes
-- Keep the long-term vision visible in all major decisions.
-- Record approvals, strategic pivots, and important tradeoffs.
-- Maintain clarity between operations and executive direction.
+- Keep executive context concise, current, and decision-oriented.
+- Record strategic direction, delegation choices, and key follow-ups.
+- Preserve continuity across projects and leadership decisions.
