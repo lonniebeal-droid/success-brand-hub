@@ -23,10 +23,18 @@ def test_dry_run_has_no_external_action(manifest):
     assert result["external_action"] is False
 
 
-def test_missing_secrets_block_staging(manifest):
+def test_dry_run_reports_missing_staging_secrets_without_external_action(manifest):
+    adapter = DeploymentAdapter("example", ("JESSE_MISSING_SECRET",))
+    result = DeploymentOrchestrator(manifest, [adapter]).deploy("staging", SHA, dry_run=True, tests_passed=True)
+    assert result["adapters"][0]["valid"] is False
+    assert result["adapters"][0]["status"] == "configuration_required"
+    assert result["external_action"] is False
+
+
+def test_missing_secrets_block_non_dry_run_staging(manifest):
     adapter = DeploymentAdapter("example", ("JESSE_MISSING_SECRET",))
     with pytest.raises(DeploymentError, match="incomplete"):
-        DeploymentOrchestrator(manifest, [adapter]).deploy("staging", SHA, tests_passed=True)
+        DeploymentOrchestrator(manifest, [adapter]).deploy("staging", SHA, dry_run=False, tests_passed=True)
 
 
 def test_staging_validates_with_configured_secret(manifest, monkeypatch):

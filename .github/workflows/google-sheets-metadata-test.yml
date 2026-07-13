@@ -71,6 +71,38 @@ jobs:
             "https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}")"
           unset access_token
 
+          api_error_status=""
+          api_error_reason=""
+          api_error_message=""
+          if [[ "$http_status" != 200 ]]; then
+            read -r api_error_status api_error_reason api_error_message < <(
+              python - "$response_file" <<'PY'
+          import json
+          import sys
+
+          try:
+              with open(sys.argv[1], encoding="utf-8") as response:
+                  error = json.load(response).get("error", {})
+          except (OSError, json.JSONDecodeError):
+              error = {}
+
+          details = error.get("details", [])
+          reason = next(
+              (
+                  detail.get("reason", "")
+                  for detail in details
+                  if isinstance(detail, dict) and detail.get("reason")
+              ),
+              "",
+          )
+          message = " ".join(str(error.get("message", "")).split())
+          # Keep the summary single-line and avoid shell parsing ambiguity.
+          print(error.get("status", ""), reason, message.replace(" ", "_"))
+          PY
+            )
+            api_error_message="${api_error_message//_/ }"
+          fi
+
           metadata_accessible=false
           spreadsheet_match=false
           worksheet_found=false
@@ -113,6 +145,9 @@ jobs:
             echo "worksheet_found: $worksheet_found"
             echo "sheet_count: $sheet_count"
             echo "http_status: $http_status"
+            echo "api_error_status: ${api_error_status:-none}"
+            echo "api_error_reason: ${api_error_reason:-none}"
+            echo "api_error_message: ${api_error_message:-none}"
             echo "rows_read: 0"
             echo "rows_written: 0"
             echo "timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"

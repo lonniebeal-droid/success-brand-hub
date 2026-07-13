@@ -35,11 +35,18 @@ class DeploymentAdapter:
 
     def deploy(self, environment: str, *, dry_run: bool = True, approved: bool = False) -> dict[str, Any]:
         validation = self.validate(environment, approved=approved)
-        if not validation["valid"]:
+        # A dry run must remain useful before optional third-party integrations
+        # are configured. Report missing configuration, but only block an
+        # execution attempt that could otherwise use that integration.
+        if not validation["valid"] and not dry_run:
             raise DeploymentError(f"{self.name} configuration is incomplete")
         return {
             **validation,
-            "status": "planned" if dry_run else "simulated",
+            "status": (
+                "configuration_required"
+                if dry_run and not validation["valid"]
+                else "planned" if dry_run else "simulated"
+            ),
             "dry_run": dry_run,
             "external_action": False,
             "rollback_metadata": {"captured": False, "reason": "adapter is network-free"},
