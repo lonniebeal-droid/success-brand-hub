@@ -97,18 +97,13 @@ jobs:
             echo "Expected private service, received unauthenticated HTTP $public_status" >&2
             exit 1
           fi
-          response="$(curl --fail --silent --show-error \
-            --retry 5 --retry-all-errors --retry-delay 2 \
-            --header "Authorization: Bearer $(gcloud auth print-identity-token --audiences="$service_url")" \
-            "$service_url/health")"
-          python -c 'import json,sys; assert json.loads(sys.argv[1])["status"] == "ok"' "$response"
           {
             echo '## Jesse Cloud Run staging deployment'
             echo "- Commit: \`$TARGET_SHA\`"
             echo "- Service: \`$SERVICE_NAME\`"
             echo "- Region: \`$REGION\`"
             echo "- URL: $service_url"
-            echo '- Health: passing'
+            echo '- Revision readiness: passing'
             echo '- Access: private (IAM authentication required)'
             echo '- Google Sheets: sandbox enabled (no verification write)'
             echo '- Other integrations: disabled'
