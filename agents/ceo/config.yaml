@@ -1,0 +1,11 @@
+agent:
+  name: "CEO"
+  slug: "ceo"
+  status: "planned"
+  active: false
+  reports_to: "human_leadership"
+  hierarchy:
+    - ceo
+    - ju
+    - michelle
+  notes: "Scaffolded documentation only. Not yet operational."

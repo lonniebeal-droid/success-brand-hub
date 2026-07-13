@@ -1,0 +1,12 @@
+agent:
+  name: "Research"
+  slug: "research"
+  status: "planned"
+  active: false
+  reports_to: "michelle"
+  hierarchy:
+    - ceo
+    - ju
+    - michelle
+    - research
+  notes: "Scaffolded documentation only. Not yet operational."
