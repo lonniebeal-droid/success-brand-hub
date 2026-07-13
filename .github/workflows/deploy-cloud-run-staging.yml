@@ -76,6 +76,7 @@ jobs:
             --platform managed \
             --no-allow-unauthenticated \
             --service-account "$GCP_SERVICE_ACCOUNT" \
+            --set-secrets "JESSE_ADMIN_TOKEN=jesse-staging-admin-token:latest" \
             --min-instances 0 \
             --max-instances 1 \
             --cpu 1 \
