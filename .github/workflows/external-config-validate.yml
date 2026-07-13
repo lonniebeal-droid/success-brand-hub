@@ -1,0 +1,45 @@
+name: Validate Make and ElevenLabs config
+
+on:
+  pull_request:
+    paths:
+      - "config/external/**"
+      - "scripts/external_config_sync.py"
+      - "tests/test_external_config_sync.py"
+      - ".github/workflows/external-config-*.yml"
+  push:
+    branches: [main]
+    paths:
+      - "config/external/**"
+      - "scripts/external_config_sync.py"
+      - "tests/test_external_config_sync.py"
+      - ".github/workflows/external-config-*.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Validate tracked manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r manifest; do
+            python scripts/external_config_sync.py validate "$manifest"
+          done < <(find config/external -name '*.json' -type f -print | sort)
+      - name: Run config sync tests
+        run: python -m pytest tests/test_external_config_sync.py -q
+      - name: Scan tracked config for secrets and webhooks
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R -nEi '(api[_-]?key|authorization|bearer|client[_-]?secret|password|private[_-]?key|refresh[_-]?token|webhook[_-]?url|https?://)' config/external; then
+            echo 'Tracked external config contains a forbidden credential or URL field.' >&2
+            exit 1
+          fi

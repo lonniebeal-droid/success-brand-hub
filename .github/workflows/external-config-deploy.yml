@@ -1,0 +1,92 @@
+name: Deploy Make or ElevenLabs config
+
+on:
+  workflow_dispatch:
+    inputs:
+      manifest:
+        description: Path under config/external ending in .json
+        required: true
+      target:
+        description: Protected GitHub environment
+        required: true
+        type: choice
+        options: [staging, production]
+      dry_run:
+        description: Plan only; no provider write
+        required: true
+        type: boolean
+        default: true
+      production_confirmation:
+        description: For production only, type DEPLOY
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-reviewed-config:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    env:
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY || secrets.ELEVENLABS_SANDBOX_API_KEY }}
+      ELEVENLABS_AGENT_ID: ${{ vars.ELEVENLABS_AGENT_ID || vars.ELEVENLABS_SANDBOX_AGENT_ID }}
+      ELEVENLABS_BRANCH_ID: ${{ vars.ELEVENLABS_BRANCH_ID }}
+      MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+      MAKE_API_BASE_URL: ${{ vars.MAKE_API_BASE_URL }}
+      MAKE_APPOINTMENT_SCENARIO_ID: ${{ vars.MAKE_APPOINTMENT_SCENARIO_ID }}
+      MAKE_CANCELLATION_SCENARIO_ID: ${{ vars.MAKE_CANCELLATION_SCENARIO_ID }}
+      MAKE_RESCHEDULE_SCENARIO_ID: ${{ vars.MAKE_RESCHEDULE_SCENARIO_ID }}
+      EXTERNAL_CONFIG_DEPLOY_ENABLED: ${{ inputs.dry_run == false && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Validate selected manifest and target
+        shell: bash
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          case "$MANIFEST" in
+            config/external/*.json|config/external/*/*.json) ;;
+            *) echo 'Manifest must be a JSON file under config/external.' >&2; exit 2 ;;
+          esac
+          test -f "$MANIFEST"
+          python scripts/external_config_sync.py validate "$MANIFEST"
+          python - "$MANIFEST" "$TARGET" <<'PY'
+          import json, pathlib, sys
+          root = pathlib.Path("config/external").resolve()
+          path = pathlib.Path(sys.argv[1]).resolve()
+          path.relative_to(root)
+          if path.suffix != ".json":
+              raise SystemExit("Manifest must be JSON")
+          manifest = json.loads(path.read_text())
+          if manifest["target"] != sys.argv[2]:
+              raise SystemExit("Selected GitHub environment does not match manifest target")
+          PY
+      - name: Dry-run plan
+        if: inputs.dry_run == true
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: python scripts/external_config_sync.py deploy "$MANIFEST"
+      - name: Apply reviewed config
+        if: inputs.dry_run == false
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+          PRODUCTION_CONFIRMATION: ${{ inputs.production_confirmation }}
+        run: |
+          python scripts/external_config_sync.py deploy "$MANIFEST" \
+            --apply \
+            --confirm-production "$PRODUCTION_CONFIRMATION"
+      - name: Safe summary
+        run: |
+          {
+            echo '## External config deployment'
+            echo "Target: ${{ inputs.target }}"
+            echo "Dry run: ${{ inputs.dry_run }}"
+            echo "Manifest commit: $GITHUB_SHA"
+            echo 'Credentials printed: false'
+            echo 'Production requires the protected production environment plus DEPLOY confirmation.'
+          } >> "$GITHUB_STEP_SUMMARY"
