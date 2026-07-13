@@ -1,42 +1,37 @@
-# Architecture
+# Success Brand Hub Architecture
 
-## Core platform runtime
+## Runtime
 
-Success Brand Hub now includes shared discovery, messaging, memory, and REST API services under `core/`. Ju provides executive routing, delegation, events, memory, and reporting. Michelle provides task, project, workflow, notification, status, and escalation services. See `docs/core-platform-architecture.md` for component boundaries and current limitations.
+The FastAPI platform provides JWT/RBAC, SQLite persistence, migrations, a durable task queue, scheduling, notification records, agent delegation, content-pack generation, CRM, call-center records, and local semantic retrieval. Astro supplies six staging dashboards and public-facing pages.
 
-High-level architecture placeholder for Success Brand Hub.
+## Agent flow
 
-Sections to include:
+1. An Admin or Manager submits an objective.
+2. The orchestration router selects one specialist using explicit routing rules.
+3. A durable task is created with `human_approval_required: true`.
+4. A worker processes locally approved work.
+5. External actions pass through disabled-by-default provider adapters.
+6. Activity, results, and failures are stored without credentials or raw caller data.
 
-- Overview
-  - Goals of the architecture
-  - Design principles (scalability, modularity, observability, security)
+## Integrations
 
-- System Components
-  - Agent orchestration layer
-  - Active agents include Ju, Michelle, Sales, Research, Finance, Operations, and SuccessBrand
-  - Integrations (Gmail, Drive, Calendar, ElevenLabs, Gemini, Twilio)
-  - Storage and knowledge base
-  - Web / UI components
-  - Automation and workflow engines (n8n, Make, Zapier)
+- Google Sheets supports disabled, mock, and WIF/ADC-backed staging modes.
+- Google Calendar, Gmail, n8n, Twilio, and ElevenLabs expose protected disabled/mock control-plane endpoints.
+- No provider is enabled by default. Sandbox mode fails closed until its approved transport and account configuration exist.
 
-- Data Flow
-  - Ingest -> Process -> Store -> Publish
-  - Eventing and messaging patterns
+## Security boundaries
 
-- Security and Access
-  - Authentication and secrets management
-  - Audit logging and role-based access
+- Admin: identity and system administration.
+- Manager: delegation and manual sandbox operations.
+- Agent: approved task and content operations.
+- Viewer: read-only status.
+- Secrets are supplied by environment or workload identity, never repository files.
+- Content and external operations require human review.
 
-- Deployment
-  - Suggested deployment topology
-  - Environment separation (dev/stage/prod)
+## Data and retrieval
 
-- Observability
-  - Logging, metrics, and tracing recommendations
+SQLite stores platform, CRM, call-center, memory, and integration audit records. Memory search supports literal lookup and deterministic local token-cosine ranking. External embedding providers may be added later behind the same disabled-by-default pattern.
 
-Next steps:
-- Produce component diagrams, sequence flows, and a more detailed component spec.
-# Platform v2 staging layer
+## Deployment
 
-Platform v2 adds SQLite persistence, role-based JWT authentication, persistent task processing, agent heartbeats, monitoring, durable memory, local scheduling, notification records, and protected REST controls around the completed Jesse, Ju, and Michelle work. The executive and admin dashboards are staging-only views. Live Twilio, ElevenLabs, Google, n8n, email, and SMS behavior remains disabled, and production deployment is unchanged.
+Development, staging, and production are separate. Cloud Run staging and GitHub OIDC/WIF are configured. Production integrations and deployment remain intentionally disabled until provider-specific approval, privacy review, rollback testing, and monitoring are complete.

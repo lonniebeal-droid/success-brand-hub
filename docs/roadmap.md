@@ -1,31 +1,38 @@
-# Roadmap
+# Success Brand Hub Roadmap
 
-This is the placeholder roadmap for Success Brand Hub. It should describe the planned milestones and timelines for the project.
+## Completed
 
-Sections to include:
+- Repository architecture and department specifications
+- Jesse, Ju, and Michelle local runtimes
+- JWT/RBAC, persistence, migrations, queue, scheduling, monitoring, CRM, and mock call center
+- Six Astro pages and staging container workflow
+- Google Workload Identity Federation and one controlled redacted Sheet write
+- WIF/ADC Google Sheets application adapter
+- Deterministic semantic memory retrieval
+- Review-only SuccessBrand content packs
+- Agent delegation and disabled/mock provider control plane
 
-- Overview
-  - Goals and strategic alignment
+## Account-dependent staging gates
 
-- Milestones
-  - Milestone 0: Project scaffolding and architecture (complete)
-  - Milestone 1: Core agent platform and integrations
-  - Milestone 2: Content production workflows and automation
-  - Milestone 3: Analytics, monetization, and scaling
+These are code-ready control-plane capabilities, not active providers:
 
-- Timeline
-  - Phase A (Quarter 1): Foundation and integrations
-  - Phase B (Quarter 2): Agent orchestration and content pipelines
-  - Phase C (Quarter 3): Testing and initial launches
+- Google Calendar test calendar and scoped OAuth/ADC transport
+- Gmail test mailbox and draft-only OAuth transport
+- n8n staging instance, signed webhook, and dead-letter workflow
+- Twilio test number and approved call policy
+- ElevenLabs cloned test agent and approved voice policy
 
-- Risks and Mitigations
-  - Integration complexity — plan: incremental adapters
-  - Data privacy — plan: policies and secure storage
+Each provider requires account ownership, managed configuration, a dedicated review, and one controlled fake-data test. No production activation is implied.
 
-- Metrics of Success
-  - Time-to-publish for a content item
-  - Number of automated workflows implemented
-  - Uptime for core services
+## Operational readiness gates
 
-Next steps:
-- Convert this placeholder roadmap into a timeboxed, versioned roadmap.
+- Human-approved SuccessBrand knowledge facts and clinical language
+- Field-level CRM privacy policy and encrypted document storage
+- Backup restore drill and incident-response exercise
+- Monitoring alerts, audit retention, and rate-limit review
+- Accessibility and mobile QA
+- Production privacy, security, and mental-health safety approval
+
+## Release rule
+
+No feature moves from `disabled` to `sandbox`, or from `sandbox` to `production`, without a reviewed pull request, passing tests, an approved account configuration, a rollback path, and human authorization.
