@@ -30,5 +30,6 @@ def test_cli_emits_json_without_external_calls() -> None:
     env = dict(os.environ, CONTENT_GENERATION_MODE="mock")
     result = subprocess.run([sys.executable, "-m", "agents.content.cli", "small business growth"], check=True, capture_output=True, text=True, env=env)
     payload = json.loads(result.stdout)
-    assert payload["mode"] == "mock"
-    assert payload["drafts"][0]["approval_status"] == "draft"
+    assert payload["batch"]["mode"] == "mock"
+    assert payload["batch"]["drafts"][0]["approval_status"] == "draft"
+    assert payload["archive"] is None
