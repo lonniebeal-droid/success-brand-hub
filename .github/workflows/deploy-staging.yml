@@ -34,7 +34,7 @@ jobs:
       JESSE_GOOGLE_STAGING_CALENDAR_ID: ${{ secrets.JESSE_GOOGLE_STAGING_CALENDAR_ID }}
       JESSE_GOOGLE_STAGING_SHEET_ID: ${{ secrets.JESSE_GOOGLE_STAGING_SHEET_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ env.TARGET_SHA }}
       - uses: google-github-actions/auth@v3
@@ -42,7 +42,7 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
           project_id: ${{ vars.GCP_PROJECT_ID }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
