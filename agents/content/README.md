@@ -49,10 +49,27 @@ Reports to Michelle, who reports to Ju, who reports to the CEO. Works closely wi
 Content agent identifies an issue it cannot resolve within scope, then escalates to Michelle. If unresolved or if it involves brand risk, legal exposure, or cross-department conflict, Michelle escalates to Ju, who escalates to the CEO and human leadership as needed.
 
 ## Current Status
-Planned. This department has not yet been activated. No workflows, tools, or integrations are live. All processes described in this document are proposed designs pending approval and rollout.
+Pilot. The draft-only pipeline generates structured scripts, captions, hashtags, image prompts, Flow prompts, and Veo prompts. It never publishes content and every result requires human approval.
+
+Run locally without external calls:
+
+```bash
+CONTENT_GENERATION_MODE=mock python -m agents.content.cli "building confidence" --quantity 3
+```
+
+Run with Gemini on Vertex AI using Application Default Credentials:
+
+```bash
+export CONTENT_GENERATION_MODE=vertex
+export GOOGLE_CLOUD_PROJECT=success-brand-staging
+export GOOGLE_CLOUD_LOCATION=global
+python -m agents.content.cli "building confidence" --quantity 3
+```
+
+Vertex mode is opt-in so tests and ordinary staging runs cannot spend credits accidentally. The default model is `gemini-2.5-flash`; override it with `CONTENT_VERTEX_MODEL`.
 
 ## Known Limitations
-- No live content production, publishing, or distribution system is connected yet
+- No publishing or distribution system is connected
 - No approved brand guideline document exists yet to check against
 - Performance measurement tools and analytics access have not been established
 - All KPI targets are placeholders pending human sign-off

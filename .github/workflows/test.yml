@@ -27,6 +27,8 @@ jobs:
       - run: npm ci
       - name: Test Jesse
         run: python -m pytest agents/jessie/tests -q
+      - name: Test Content pipeline
+        run: python -m pytest agents/content/tests -q
       - name: Build Astro
         env:
           ASTRO_TELEMETRY_DISABLED: "1"
