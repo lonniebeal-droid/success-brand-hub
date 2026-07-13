@@ -6,11 +6,11 @@ This integration writes only manually triggered, redacted rows to a dedicated no
 
 Create a spreadsheet used only for staging. Add a worksheet such as `Sandbox Leads` with columns: `schema_version`, `record_id`, `created_timestamp`, `redacted_phone`, `redacted_email`, `reason_category`, `urgency`, `status`, `source`, and `request_id`.
 
-## Service account and staging secrets
+## Service account and staging variables
 
-Create a Google Cloud service account for staging, enable the Google Sheets API, and share only the test spreadsheet with the service-account email as Editor. Do not download or commit a credential file. Store its complete JSON as an environment-scoped GitHub staging secret with required reviewers.
+Create a Google Cloud service account for staging, enable the Google Sheets API, and share only the test spreadsheet with the service-account email as Editor. Do not create, download, or store a JSON service-account key. GitHub Actions authenticates with Workload Identity Federation and the application uses Application Default Credentials.
 
-Set `GOOGLE_SHEETS_SANDBOX_ENABLED=true`, `GOOGLE_SHEETS_MODE=sandbox`, `GOOGLE_SHEETS_SPREADSHEET_ID`, `GOOGLE_SHEETS_WORKSHEET_NAME`, and `GOOGLE_SERVICE_ACCOUNT_JSON` only in staging. Never expose these values to Astro or browser JavaScript.
+Set `GOOGLE_SHEETS_SANDBOX_ENABLED=true`, `GOOGLE_SHEETS_MODE=sandbox`, `GOOGLE_SHEETS_SPREADSHEET_ID`, `GOOGLE_SHEETS_WORKSHEET_NAME`, `GOOGLE_AUTH_MODE=adc`, and `GCP_PROJECT_ID=success-brand-staging` as GitHub staging environment variables. The v1 adapter rejects any project, spreadsheet, or worksheet outside its staging allowlist. Never expose these values to Astro or browser JavaScript.
 
 ## Permissions and manual flow
 
@@ -22,6 +22,6 @@ Only the final four phone digits and a masked email marker may leave the platfor
 
 ## Test, disable, and rollback
 
-Call `POST /sandbox/google-sheets/test-connection` as an Admin or Manager. Set `GOOGLE_SHEETS_SANDBOX_ENABLED=false` to stop all writes immediately. Remove the staging secret and revoke the service-account key to fully disconnect. Revert this feature branch to remove code; retain the test sheet until audit requirements are satisfied.
+Call `POST /sandbox/google-sheets/test-connection` as an Admin or Manager. This validates configuration without writing a row. Set `GOOGLE_SHEETS_SANDBOX_ENABLED=false` to stop all writes immediately. Remove the service account's access to the sandbox spreadsheet to fully disconnect. Revert this feature branch to remove code; retain the test sheet until audit requirements are satisfied.
 
 This remains a sandbox integration. Managed staging deployment, audit-log review, retention policy, retry monitoring, and human approval are required before broader use.

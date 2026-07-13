@@ -35,6 +35,24 @@ def create_google_sheets_router(database: Database, adapter: GoogleSheetsAdapter
         safe = {key: value for key, value in payload.items() if key not in {"spreadsheet_id", "credentials", "service_account"}}
         result = JSONResponse(safe, status_code=status_code); result.headers["X-Request-ID"] = rid; return result
 
+    def error_response(exc: GoogleSheetsSandboxError, rid: str) -> JSONResponse:
+        message = str(exc)
+        if "already written" in message:
+            code, status_code = "duplicate", 409
+        elif "not found" in message:
+            code, status_code = "not_found", 404
+        elif message in {"sandbox sheet write failed safely", "sandbox write failed safely"}:
+            code, status_code = "upstream_error", 502
+            message = "Google Sheets sandbox write failed safely"
+        else:
+            code, status_code = "validation_error", 400
+        return response({"error": {"code": code, "message": message, "request_id": rid}}, rid, status_code)
+
+    def write_response(payload: dict, rid: str) -> JSONResponse:
+        if payload.get("status") == "disabled":
+            return response({"error": {"code": "disabled", "message": "Google Sheets sandbox writes are disabled", "request_id": rid}}, rid, 503)
+        return response(payload, rid)
+
     def write_guard(request: Request, user: dict = Depends(require_role("manager"))) -> tuple[dict, str]:
         check_limit(user, request); return user, request_id(request)
 
@@ -45,19 +63,19 @@ def create_google_sheets_router(database: Database, adapter: GoogleSheetsAdapter
     @router.post("/intakes/{intake_id}")
     def write_intake(intake_id: str, request: Request, auth=Depends(write_guard)):
         _, rid = auth
-        try: return response(service.write_intake(intake_id, rid), rid)
-        except GoogleSheetsSandboxError as exc: raise HTTPException(409, str(exc)) from exc
+        try: return write_response(service.write_intake(intake_id, rid), rid)
+        except GoogleSheetsSandboxError as exc: return error_response(exc, rid)
 
     @router.post("/leads/{lead_id}")
     def write_lead(lead_id: str, request: Request, auth=Depends(write_guard)):
         _, rid = auth
-        try: return response(service.write_lead(lead_id, rid), rid)
-        except GoogleSheetsSandboxError as exc: raise HTTPException(409, str(exc)) from exc
+        try: return write_response(service.write_lead(lead_id, rid), rid)
+        except GoogleSheetsSandboxError as exc: return error_response(exc, rid)
 
     @router.post("/test-connection")
     def test_connection(request: Request, auth=Depends(write_guard)):
         _, rid = auth
         try: return response(service.adapter.test_connection(), rid)
-        except GoogleSheetsSandboxError as exc: raise HTTPException(400, str(exc)) from exc
+        except GoogleSheetsSandboxError as exc: return error_response(exc, rid)
 
     return router

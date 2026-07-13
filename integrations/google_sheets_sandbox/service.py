@@ -57,7 +57,7 @@ class GoogleSheetsSandboxService:
         with self.database.session() as session:
             lead = session.get(CRMParty, lead_id)
             if not lead or lead.kind != "lead": raise GoogleSheetsSandboxError("CRM lead not found")
-            row = SandboxRow(SCHEMA_VERSION, lead.id, lead.created_at.isoformat(), redact_phone(lead.phone), redact_email(lead.email), self.reason_category(lead.metadata_json.get("reason")), lead.metadata_json.get("urgency", "normal"), lead.status, lead.source, request_id)
+            row = SandboxRow(SCHEMA_VERSION, lead.id, lead.created_at.isoformat(), redact_phone(lead.phone), redact_email(lead.email), self.reason_category(lead.metadata_json.get("reason")), lead.metadata_json.get("urgency", "normal"), lead.status, "crm", request_id)
         result = self._write("crm", lead_id, request_id, row)
         with self.database.session() as session:
             session.add(CRMActivity(id=str(uuid.uuid4()), party_id=lead_id, event="google_sheets_sandbox_written", detail={"row_reference": result.get("row_reference"), "request_id": request_id})); session.commit()

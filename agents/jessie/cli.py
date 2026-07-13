@@ -14,6 +14,7 @@ from agents.jessie.integrations.n8n_adapter import N8NAdapter
 from agents.jessie.src.reporting_service import ReportingService
 from fastapi.testclient import TestClient
 from agents.jessie.deployment import DeploymentBlocked, DeploymentOrchestrator
+from agents.jessie.deployment.google import GoogleDeployment
 
 
 def _service() -> IntakeService:
@@ -116,7 +117,7 @@ def deploy_dry_run(args: argparse.Namespace) -> int:
 
 
 def deploy_staging(args: argparse.Namespace) -> int:
-    result = DeploymentOrchestrator().deploy("staging", args.commit_sha, dry_run=True, tests_passed=True)
+    result = DeploymentOrchestrator(adapters=[GoogleDeployment()]).deploy("staging", args.commit_sha, dry_run=True, tests_passed=True)
     print(json.dumps(result, indent=2))
     return 0
 

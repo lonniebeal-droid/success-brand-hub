@@ -1,10 +1,8 @@
-import json
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from agents.jessie.integrations.google_sheets_adapter import GoogleSheetsAdapter, GoogleSheetsSandboxError, SCHEMA_VERSION, SandboxRow, redact_email, redact_phone
+from agents.jessie.integrations.google_sheets_adapter import GoogleSheetsAdapter, GoogleSheetsSandboxError, SCHEMA_VERSION, STAGING_PROJECT_ID, STAGING_SPREADSHEET_ID, STAGING_WORKSHEET_NAME, SandboxRow, redact_email, redact_phone
 from agents.jessie.src.intake_service import IntakeService
 from agents.jessie.src.storage import InMemoryStorage
 from core.auth import create_user
@@ -26,10 +24,6 @@ def row():
     return SandboxRow(SCHEMA_VERSION, "record-1", "2026-01-01T00:00:00Z", "***1234", "a***@***", "appointment", "normal", "new", "crm", "request-1")
 
 
-def credentials():
-    return json.dumps({"client_email": "sandbox-service@example.invalid", "private_key": "test-only-key", "token_uri": "https://oauth2.googleapis.com/token"})
-
-
 def test_disabled_and_mock_modes_never_call_network():
     calls = []
     disabled = GoogleSheetsAdapter(enabled=False, mode="mock", transport=lambda **kwargs: calls.append(kwargs))
@@ -44,7 +38,7 @@ def test_sandbox_mode_mocked_transport_redacts_and_retries():
         attempts.append(kwargs)
         if len(attempts) == 1: raise RuntimeError("temporary")
         return {"updatedRange": "Sandbox Leads!A2:J2"}
-    adapter = GoogleSheetsAdapter(True, "sandbox", "A_valid_sandbox_spreadsheet_123", "Sandbox Leads", credentials(), transport, max_retries=2)
+    adapter = GoogleSheetsAdapter(True, "sandbox", STAGING_SPREADSHEET_ID, STAGING_WORKSHEET_NAME, "adc", STAGING_PROJECT_ID, transport, max_retries=2)
     result = adapter.append_row(row())
     assert result["status"] == "written" and len(attempts) == 2
     values = attempts[-1]["values"]
@@ -52,9 +46,52 @@ def test_sandbox_mode_mocked_transport_redacts_and_retries():
     assert not any("555" in value or "@example" in value for value in values)
 
 
+def test_google_transport_uses_adc_and_the_allowlisted_range(monkeypatch):
+    captured = {}
+
+    class Credentials:
+        token = "test-token"
+
+        def refresh(self, request):
+            captured["refreshed"] = True
+
+    class Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"updates": {"updatedRange": "Sandbox Leads!A2:J2"}}
+
+    def fake_default(*, scopes):
+        captured["scopes"] = scopes
+        return Credentials(), STAGING_PROJECT_ID
+
+    def fake_post(url, **kwargs):
+        captured.update(url=url, request=kwargs)
+        return Response()
+
+    monkeypatch.setattr("google.auth.default", fake_default)
+    monkeypatch.setattr("httpx.post", fake_post)
+    result = GoogleSheetsAdapter._google_transport(
+        spreadsheet_id=STAGING_SPREADSHEET_ID,
+        worksheet_name=STAGING_WORKSHEET_NAME,
+        values=row().values(),
+        project_id=STAGING_PROJECT_ID,
+    )
+
+    assert result["updatedRange"] == "Sandbox Leads!A2:J2"
+    assert captured["refreshed"] is True
+    assert captured["scopes"] == ["https://www.googleapis.com/auth/spreadsheets"]
+    assert STAGING_SPREADSHEET_ID in captured["url"]
+    assert "%27Sandbox%20Leads%27%21A%3AJ" in captured["url"]
+    assert captured["request"]["headers"] == {"Authorization": "Bearer test-token"}
+
+
 def test_startup_validation_and_strict_contract():
-    with pytest.raises(GoogleSheetsSandboxError): GoogleSheetsAdapter(True, "sandbox", "bad", "Sheet", credentials()).validate_startup()
-    with pytest.raises(GoogleSheetsSandboxError): GoogleSheetsAdapter(True, "sandbox", "A_valid_sandbox_spreadsheet_123", "Sheet", "").validate_startup()
+    with pytest.raises(GoogleSheetsSandboxError): GoogleSheetsAdapter(True, "sandbox", "bad", "Sheet", "adc", STAGING_PROJECT_ID).validate_startup()
+    with pytest.raises(GoogleSheetsSandboxError): GoogleSheetsAdapter(True, "sandbox", STAGING_SPREADSHEET_ID, "Other Sheet", "adc", STAGING_PROJECT_ID).validate_startup()
+    with pytest.raises(GoogleSheetsSandboxError): GoogleSheetsAdapter(True, "sandbox", STAGING_SPREADSHEET_ID, STAGING_WORKSHEET_NAME, "json", STAGING_PROJECT_ID).validate_startup()
+    with pytest.raises(GoogleSheetsSandboxError): GoogleSheetsAdapter(True, "sandbox", STAGING_SPREADSHEET_ID, STAGING_WORKSHEET_NAME, "adc", "production-project").validate_startup()
     with pytest.raises(GoogleSheetsSandboxError): SandboxRow(SCHEMA_VERSION, "x", "now", "555-111-2222", "raw@example.com", "general", "normal", "new", "crm", "r").validate()
     assert redact_phone("555-111-9876") == "***9876" and redact_email("private@example.com") == "p***@***"
 
@@ -93,7 +130,7 @@ def test_permissions_status_and_safe_errors(db, monkeypatch):
 
     manager, manager_headers = auth_client(db, monkeypatch, "manager")
     result = manager.post("/sandbox/google-sheets/leads/missing", headers=manager_headers)
-    assert result.status_code == 409 and result.headers.get("X-Request-ID")
+    assert result.status_code == 404 and result.headers.get("X-Request-ID")
     assert "sqlite" not in result.text.lower() and "credentials" not in result.text.lower()
 
     agent, agent_headers = auth_client(db, monkeypatch, "agent")
@@ -103,14 +140,29 @@ def test_permissions_status_and_safe_errors(db, monkeypatch):
 
 def test_no_secrets_logged(caplog):
     secret = "private-key-material-must-not-log"
-    adapter = GoogleSheetsAdapter(True, "sandbox", "A_valid_sandbox_spreadsheet_123", "Sandbox Leads", credentials().replace("test-only-key", secret), lambda **kwargs: (_ for _ in ()).throw(RuntimeError(secret)), max_retries=0)
+    adapter = GoogleSheetsAdapter(True, "sandbox", STAGING_SPREADSHEET_ID, STAGING_WORKSHEET_NAME, "adc", STAGING_PROJECT_ID, lambda **kwargs: (_ for _ in ()).throw(RuntimeError(secret)), max_retries=0)
     with pytest.raises(GoogleSheetsSandboxError): adapter.append_row(row())
     assert secret not in caplog.text
 
 
 def test_failed_write_is_counted_safely(db):
-    adapter = GoogleSheetsAdapter(True, "sandbox", "A_valid_sandbox_spreadsheet_123", "Sandbox Leads", credentials(), lambda **kwargs: (_ for _ in ()).throw(RuntimeError("transport failed")), max_retries=0)
+    adapter = GoogleSheetsAdapter(True, "sandbox", STAGING_SPREADSHEET_ID, STAGING_WORKSHEET_NAME, "adc", STAGING_PROJECT_ID, lambda **kwargs: (_ for _ in ()).throw(RuntimeError("transport failed")), max_retries=0)
     service = GoogleSheetsSandboxService(db, adapter)
     with pytest.raises(GoogleSheetsSandboxError): service._write("crm", "lead-failure", "request-failure", row())
     status = service.status()
     assert status["failure_count"] == 1 and status["last_error"] == "write_failed"
+
+
+def test_disabled_and_not_found_have_explicit_api_contracts(db, monkeypatch):
+    manager, headers = auth_client(db, monkeypatch, "manager")
+    monkeypatch.setenv("GOOGLE_SHEETS_SANDBOX_ENABLED", "false")
+    monkeypatch.setenv("GOOGLE_SHEETS_MODE", "disabled")
+    disabled_client = TestClient(create_app(db))
+    token = disabled_client.post("/login", json={"username": "manager", "password": "manager-password"}).json()["access_token"]
+    disabled_headers = {"Authorization": f"Bearer {token}", "X-Request-ID": "request-disabled"}
+    lead = CRMService(db).create_party("lead", "Private Lead", "lead@example.test", "555-222-3333")
+    disabled = disabled_client.post(f"/sandbox/google-sheets/leads/{lead.id}", headers=disabled_headers)
+    assert disabled.status_code == 503 and disabled.json()["error"]["code"] == "disabled"
+
+    missing = manager.post("/sandbox/google-sheets/leads/missing", headers=headers)
+    assert missing.status_code == 404 and missing.json()["error"]["code"] == "not_found"

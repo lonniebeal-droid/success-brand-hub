@@ -1,17 +1,20 @@
 from __future__ import annotations
 
-import json
 import os
 import re
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable
+from urllib.parse import quote
 
 
 SCHEMA_VERSION = "google_sheets_sandbox_v1"
 ALLOWED_MODES = {"disabled", "mock", "sandbox"}
 SPREADSHEET_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{20,100}$")
+STAGING_PROJECT_ID = "success-brand-staging"
+STAGING_SPREADSHEET_ID = "1IJ0-MBAPT2PRW2MPmCf_B0U4ejBUtn8r-SJyngflu14"
+STAGING_WORKSHEET_NAME = "Sandbox Leads"
 REDACTED_PHONE_PATTERN = re.compile(r"^\*\*\*\d{4}$|^\[redacted\]$")
 REDACTED_EMAIL_PATTERN = re.compile(r"^[^@]{0,1}\*\*\*@\*\*\*$|^\[redacted\]$")
 
@@ -45,6 +48,16 @@ class SandboxRow:
             raise GoogleSheetsSandboxError("unsupported reason category")
         if self.source not in {"crm", "jessie"}:
             raise GoogleSheetsSandboxError("unsupported source")
+        if self.urgency not in {"low", "normal", "high", "urgent"}:
+            raise GoogleSheetsSandboxError("unsupported urgency")
+        if not re.fullmatch(r"[a-z][a-z0-9_-]{0,39}", self.status):
+            raise GoogleSheetsSandboxError("invalid status")
+        if not re.fullmatch(r"[A-Za-z0-9._:-]{1,80}", self.record_id):
+            raise GoogleSheetsSandboxError("invalid record ID")
+        try:
+            datetime.fromisoformat(self.created_timestamp.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise GoogleSheetsSandboxError("invalid created timestamp") from exc
         if not re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", self.request_id):
             raise GoogleSheetsSandboxError("invalid request ID")
         if any(".." in str(value) or str(value).startswith(("/", "~", "file:")) for value in values.values()):
@@ -74,18 +87,20 @@ def redact_email(value: str | None) -> str:
 class GoogleSheetsAdapter:
     """Disabled-by-default Google Sheets adapter for a dedicated test sheet."""
 
-    def __init__(self, enabled: bool | None = None, mode: str | None = None, spreadsheet_id: str | None = None, worksheet_name: str | None = None, credentials_json: str | None = None, transport: Callable[..., dict] | None = None, max_retries: int = 2) -> None:
+    def __init__(self, enabled: bool | None = None, mode: str | None = None, spreadsheet_id: str | None = None, worksheet_name: str | None = None, auth_mode: str | None = None, project_id: str | None = None, transport: Callable[..., dict] | None = None, max_retries: int = 2) -> None:
         self.enabled = enabled if enabled is not None else os.getenv("GOOGLE_SHEETS_SANDBOX_ENABLED", "false").lower() == "true"
         self.mode = mode or os.getenv("GOOGLE_SHEETS_MODE", "mock")
         self.spreadsheet_id = spreadsheet_id if spreadsheet_id is not None else os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID", "")
         self.worksheet_name = worksheet_name if worksheet_name is not None else os.getenv("GOOGLE_SHEETS_WORKSHEET_NAME", "")
-        self.credentials_json = credentials_json if credentials_json is not None else os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
+        self.auth_mode = auth_mode if auth_mode is not None else os.getenv("GOOGLE_AUTH_MODE", "adc")
+        self.project_id = project_id if project_id is not None else os.getenv("GCP_PROJECT_ID", "")
         self.transport = transport
         self.max_retries = max(0, min(max_retries, 2))
         self.network_calls = 0
 
     def status(self) -> dict[str, Any]:
-        return {"enabled": self.enabled, "mode": self.mode, "configured": bool(self.spreadsheet_id and self.worksheet_name and self.credentials_json) if self.mode == "sandbox" else True, "sandbox": True}
+        configured = all((self.auth_mode == "adc", self.project_id == STAGING_PROJECT_ID, self.spreadsheet_id == STAGING_SPREADSHEET_ID, self.worksheet_name == STAGING_WORKSHEET_NAME))
+        return {"enabled": self.enabled, "mode": self.mode, "configured": configured if self.mode == "sandbox" else True, "sandbox": True}
 
     def validate_startup(self) -> None:
         if self.mode not in ALLOWED_MODES:
@@ -94,14 +109,14 @@ class GoogleSheetsAdapter:
             return
         if not SPREADSHEET_ID_PATTERN.fullmatch(self.spreadsheet_id):
             raise GoogleSheetsSandboxError("invalid sandbox spreadsheet ID")
-        if not self.worksheet_name.strip():
-            raise GoogleSheetsSandboxError("sandbox worksheet name is required")
-        try:
-            credentials = json.loads(self.credentials_json)
-        except (TypeError, json.JSONDecodeError) as exc:
-            raise GoogleSheetsSandboxError("Google service-account credentials are missing or invalid") from exc
-        if not {"client_email", "private_key", "token_uri"} <= set(credentials):
-            raise GoogleSheetsSandboxError("Google service-account credentials are incomplete")
+        if self.project_id != STAGING_PROJECT_ID:
+            raise GoogleSheetsSandboxError("Google Sheets sandbox is restricted to the staging project")
+        if self.spreadsheet_id != STAGING_SPREADSHEET_ID or self.worksheet_name != STAGING_WORKSHEET_NAME:
+            raise GoogleSheetsSandboxError("Google Sheets target is not on the staging allowlist")
+        if self.auth_mode != "adc":
+            raise GoogleSheetsSandboxError("Google Sheets sandbox requires Application Default Credentials")
+        if os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"):
+            raise GoogleSheetsSandboxError("JSON service-account keys are not supported")
 
     def append_row(self, row: SandboxRow) -> dict[str, Any]:
         row.validate()
@@ -115,7 +130,7 @@ class GoogleSheetsAdapter:
         for attempt in range(self.max_retries + 1):
             try:
                 self.network_calls += 1
-                result = transport(spreadsheet_id=self.spreadsheet_id, worksheet_name=self.worksheet_name, values=row.values(), credentials_json=self.credentials_json)
+                result = transport(spreadsheet_id=self.spreadsheet_id, worksheet_name=self.worksheet_name, values=row.values(), project_id=self.project_id)
                 return {"status": "written", "mode": "sandbox", "sandbox": True, "row_reference": str(result.get("updatedRange", "sandbox-row"))}
             except Exception as exc:
                 last_error = exc
@@ -124,15 +139,17 @@ class GoogleSheetsAdapter:
         raise GoogleSheetsSandboxError("sandbox sheet write failed safely") from last_error
 
     @staticmethod
-    def _google_transport(*, spreadsheet_id: str, worksheet_name: str, values: list[str], credentials_json: str) -> dict:
+    def _google_transport(*, spreadsheet_id: str, worksheet_name: str, values: list[str], project_id: str) -> dict:
         import httpx
+        import google.auth
         from google.auth.transport.requests import Request
-        from google.oauth2 import service_account
 
-        info = json.loads(credentials_json)
-        credentials = service_account.Credentials.from_service_account_info(info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        credentials, detected_project = google.auth.default(scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        if detected_project and detected_project != project_id:
+            raise GoogleSheetsSandboxError("ADC project does not match the staging project")
         credentials.refresh(Request())
-        url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/{worksheet_name}!A:J:append"
+        target_range = quote(f"'{worksheet_name}'!A:J", safe="")
+        url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/{target_range}:append"
         response = httpx.post(url, params={"valueInputOption": "RAW", "insertDataOption": "INSERT_ROWS"}, headers={"Authorization": f"Bearer {credentials.token}"}, json={"values": [values]}, timeout=5.0)
         response.raise_for_status()
         return response.json().get("updates", {})
