@@ -500,9 +500,10 @@ def create_app(service: Optional[IntakeService] = None) -> FastAPI:
     async def sheets_intake(request: Request, intake_id: str, intake_service: IntakeService = Depends(get_intake_service)) -> JSONResponse:
         if not request.app.state.feature_flags.get("google_sheets", False):
             return _integration_disabled_payload(request, "google_sheets")
-        adapter = GoogleSheetsAdapter(enabled=True, mode="mock")
+        adapter = GoogleSheetsAdapter()
         response = adapter.append_redacted_intake(intake_id, intake_service=intake_service)
-        request.app.state.metrics["mock_sheet_writes"] += 1
+        if response.get("status") == "mock":
+            request.app.state.metrics["mock_sheet_writes"] += 1
         return _integration_response(request, "google_sheets", response)
 
     @app.post("/sandbox/gmail/follow-up/{intake_id}", dependencies=[Depends(require_auth)])

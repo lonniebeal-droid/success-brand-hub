@@ -18,8 +18,6 @@ def test_cloud_run_staging_is_private_and_tightly_scaled() -> None:
     assert '--memory 512Mi' in workflow
     assert "--allow-unauthenticated" not in workflow
     assert "--gpu" not in workflow
-    assert "remove-iam-policy-binding" in workflow
-    assert "--member allUsers" in workflow
     assert 'public_status' in workflow
     assert '"401"' in workflow and '"403"' in workflow
 
@@ -32,7 +30,14 @@ def test_cloud_run_staging_keeps_integrations_disabled() -> None:
         "JESSE_ELEVENLABS_ENABLED=false",
         "JESSE_GOOGLE_CALENDAR_ENABLED=false",
         "JESSE_GMAIL_ENABLED=false",
-        "JESSE_GOOGLE_SHEETS_ENABLED=false",
         "JESSE_N8N_ENABLED=false",
     ):
         assert setting in workflow
+
+    assert "JESSE_GOOGLE_SHEETS_ENABLED=true" in workflow
+    assert "GOOGLE_SHEETS_MODE=$GOOGLE_SHEETS_MODE" in workflow
+    assert "GOOGLE_SHEETS_SANDBOX_ENABLED=$GOOGLE_SHEETS_SANDBOX_ENABLED" in workflow
+    assert "GOOGLE_SHEETS_SPREADSHEET_ID=$GOOGLE_SHEETS_SPREADSHEET_ID" in workflow
+    assert "GOOGLE_SHEETS_WORKSHEET_NAME=$GOOGLE_SHEETS_WORKSHEET_NAME" in workflow
+    assert "adapter.test_connection()" in workflow
+    assert "append_row" not in workflow

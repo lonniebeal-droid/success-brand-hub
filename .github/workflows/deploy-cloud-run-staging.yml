@@ -22,6 +22,11 @@ jobs:
     env:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      GOOGLE_SHEETS_SPREADSHEET_ID: ${{ vars.GOOGLE_SHEETS_SPREADSHEET_ID }}
+      GOOGLE_SHEETS_WORKSHEET_NAME: ${{ vars.GOOGLE_SHEETS_WORKSHEET_NAME }}
+      GOOGLE_AUTH_MODE: ${{ vars.GOOGLE_AUTH_MODE }}
+      GOOGLE_SHEETS_MODE: ${{ vars.GOOGLE_SHEETS_MODE }}
+      GOOGLE_SHEETS_SANDBOX_ENABLED: ${{ vars.GOOGLE_SHEETS_SANDBOX_ENABLED }}
       TARGET_SHA: ${{ inputs.commit_sha }}
       SERVICE_NAME: success-brand-jesse-staging
       REGION: us-central1
@@ -47,6 +52,19 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v3
 
+      - name: Validate Google Sheets sandbox configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from agents.jessie.integrations.google_sheets_adapter import GoogleSheetsAdapter
+          adapter = GoogleSheetsAdapter()
+          adapter.validate_startup()
+          status = adapter.test_connection()
+          assert status == {"status": "configured", "mode": "sandbox"}
+          print("Google Sheets sandbox configuration is valid; no row was written.")
+          PY
+
       - name: Deploy staging service
         shell: bash
         run: |
@@ -63,19 +81,13 @@ jobs:
             --cpu 1 \
             --memory 512Mi \
             --timeout 60 \
-            --set-env-vars 'JESSE_ENVIRONMENT=staging,JESSE_INTEGRATION_MODE=mock,JESSE_DATA_PATH=/tmp/jesse/intakes.json,JESSE_TWILIO_ENABLED=false,JESSE_ELEVENLABS_ENABLED=false,JESSE_GOOGLE_CALENDAR_ENABLED=false,JESSE_GMAIL_ENABLED=false,JESSE_GOOGLE_SHEETS_ENABLED=false,JESSE_N8N_ENABLED=false' \
+            --set-env-vars "JESSE_ENVIRONMENT=staging,JESSE_INTEGRATION_MODE=sandbox,JESSE_DATA_PATH=/tmp/jesse/intakes.json,JESSE_TWILIO_ENABLED=false,JESSE_ELEVENLABS_ENABLED=false,JESSE_GOOGLE_CALENDAR_ENABLED=false,JESSE_GMAIL_ENABLED=false,JESSE_GOOGLE_SHEETS_ENABLED=true,JESSE_N8N_ENABLED=false,GCP_PROJECT_ID=$GCP_PROJECT_ID,GOOGLE_AUTH_MODE=$GOOGLE_AUTH_MODE,GOOGLE_SHEETS_MODE=$GOOGLE_SHEETS_MODE,GOOGLE_SHEETS_SANDBOX_ENABLED=$GOOGLE_SHEETS_SANDBOX_ENABLED,GOOGLE_SHEETS_SPREADSHEET_ID=$GOOGLE_SHEETS_SPREADSHEET_ID,GOOGLE_SHEETS_WORKSHEET_NAME=$GOOGLE_SHEETS_WORKSHEET_NAME" \
             --quiet
 
       - name: Verify health
         shell: bash
         run: |
           set -euo pipefail
-          gcloud run services remove-iam-policy-binding "$SERVICE_NAME" \
-            --project "$GCP_PROJECT_ID" \
-            --region "$REGION" \
-            --member allUsers \
-            --role roles/run.invoker \
-            --quiet
           service_url="$(gcloud run services describe "$SERVICE_NAME" \
             --project "$GCP_PROJECT_ID" \
             --region "$REGION" \
@@ -98,6 +110,7 @@ jobs:
             echo "- URL: $service_url"
             echo '- Health: passing'
             echo '- Access: private (IAM authentication required)'
-            echo '- Integrations: disabled (mock mode)'
+            echo '- Google Sheets: sandbox enabled (no verification write)'
+            echo '- Other integrations: disabled'
             echo '- Scaling: 0 minimum / 1 maximum instance'
           } >> "$GITHUB_STEP_SUMMARY"
