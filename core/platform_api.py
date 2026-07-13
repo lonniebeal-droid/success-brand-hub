@@ -26,6 +26,8 @@ from core.runtime.monitor import SystemMonitor
 from core.runtime.queue import PersistentTaskQueue
 from core.runtime.worker import BackgroundWorker
 from core.scheduling import SchedulingService
+from crm.router import create_crm_router
+from callcenter.router import create_callcenter_router
 
 
 class LoginRequest(BaseModel):
@@ -82,6 +84,8 @@ def create_app(database: Database | None = None) -> FastAPI:
     scheduling = SchedulingService(db)
     monitor = SystemMonitor(queue, [worker])
     app = FastAPI(title="Success Brand Platform v2", version="2.0.0")
+    app.include_router(create_crm_router(db))
+    app.include_router(create_callcenter_router(db))
 
     @app.get("/health")
     def health():
