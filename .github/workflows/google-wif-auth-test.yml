@@ -1,0 +1,98 @@
+name: Google WIF authentication test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify-wif-authentication:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Check required environment variables
+        shell: bash
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -n "$GCP_PROJECT_ID" ]] || missing+=(GCP_PROJECT_ID)
+          [[ -n "$GCP_WORKLOAD_IDENTITY_PROVIDER" ]] || missing+=(GCP_WORKLOAD_IDENTITY_PROVIDER)
+          [[ -n "$GCP_SERVICE_ACCOUNT" ]] || missing+=(GCP_SERVICE_ACCOUNT)
+          if (( ${#missing[@]} )); then
+            echo "authentication_status: failure"
+            echo "likely_cause: missing GitHub variable"
+            printf 'missing_variable: %s\n' "${missing[@]}"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud with WIF
+        id: google-auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          create_credentials_file: true
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Verify WIF authentication only
+        shell: bash
+        env:
+          EXPECTED_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+          EXPECTED_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+
+          timestamp="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          project_match=false
+          service_account_match=false
+          token_available=false
+
+          adc_available=false
+          if [[ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" && -s "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
+            adc_available=true
+          fi
+
+          active_project="$(gcloud config get-value project 2>/dev/null || true)"
+          if [[ "$active_project" == "$EXPECTED_PROJECT" ]]; then
+            project_match=true
+          fi
+
+          active_identity="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1)"
+          if [[ "$active_identity" == "$EXPECTED_SERVICE_ACCOUNT" ]]; then
+            service_account_match=true
+          fi
+
+          if gcloud auth application-default print-access-token >/dev/null 2>&1; then
+            token_available=true
+          fi
+
+          authentication_status=failure
+          if [[ "$adc_available" == true && "$project_match" == true && "$service_account_match" == true && "$token_available" == true ]]; then
+            authentication_status=success
+          fi
+
+          {
+            echo "authentication_status: $authentication_status"
+            echo "project_match: $project_match"
+            echo "service_account_match: $service_account_match"
+            echo "token_available: $token_available"
+            echo "timestamp: $timestamp"
+            echo "workflow_run_id: $GITHUB_RUN_ID"
+            echo "commit_sha: $GITHUB_SHA"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$authentication_status" != success ]]; then
+            echo "Authentication verification failed. Review the provider resource, repository condition, environment selection, service-account impersonation permission, and id-token permission." >&2
+            exit 1
+          fi
