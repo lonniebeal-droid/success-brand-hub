@@ -14,6 +14,9 @@ def test_vertex_pilot_is_staging_only_and_bounded() -> None:
     assert "CONTENT_STORAGE_MODE: gcs" in content
     assert "--quantity 1" in content
     assert "requires_human_approval" in content
+    assert "actions/upload-artifact@v4" in content
+    assert "retention-days: 7" in content
+    assert "Approval must be recorded outside this package" in content
     assert "Publishing: disabled" in content
     assert "deploy-production" not in content
     assert "allow-unauthenticated" not in content
