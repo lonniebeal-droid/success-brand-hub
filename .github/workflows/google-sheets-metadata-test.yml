@@ -1,0 +1,125 @@
+name: Google Sheets read-only metadata test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify-sheets-metadata:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Check required environment variables
+        shell: bash
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          GOOGLE_SHEETS_SPREADSHEET_ID: ${{ vars.GOOGLE_SHEETS_SPREADSHEET_ID }}
+          GOOGLE_SHEETS_WORKSHEET_NAME: ${{ vars.GOOGLE_SHEETS_WORKSHEET_NAME }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -n "$GCP_PROJECT_ID" ]] || missing+=(GCP_PROJECT_ID)
+          [[ -n "$GCP_WORKLOAD_IDENTITY_PROVIDER" ]] || missing+=(GCP_WORKLOAD_IDENTITY_PROVIDER)
+          [[ -n "$GCP_SERVICE_ACCOUNT" ]] || missing+=(GCP_SERVICE_ACCOUNT)
+          [[ -n "$GOOGLE_SHEETS_SPREADSHEET_ID" ]] || missing+=(GOOGLE_SHEETS_SPREADSHEET_ID)
+          [[ -n "$GOOGLE_SHEETS_WORKSHEET_NAME" ]] || missing+=(GOOGLE_SHEETS_WORKSHEET_NAME)
+          if (( ${#missing[@]} )); then
+            echo "metadata_test_status: failure"
+            echo "likely_cause: missing GitHub staging variable"
+            printf 'missing_variable: %s\n' "${missing[@]}"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+
+      - name: Authenticate to Google Cloud with WIF
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          create_credentials_file: true
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Verify read-only spreadsheet metadata
+        shell: bash
+        env:
+          SPREADSHEET_ID: ${{ vars.GOOGLE_SHEETS_SPREADSHEET_ID }}
+          EXPECTED_WORKSHEET: ${{ vars.GOOGLE_SHEETS_WORKSHEET_NAME }}
+        run: |
+          set -euo pipefail
+
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+
+          access_token="$(gcloud auth application-default print-access-token)"
+          http_status="$(curl --silent --show-error \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            --header "Authorization: Bearer $access_token" \
+            --get \
+            --data-urlencode 'includeGridData=false' \
+            --data-urlencode 'fields=spreadsheetId,properties.title,sheets.properties(sheetId,title,index,sheetType)' \
+            "https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}")"
+          unset access_token
+
+          metadata_accessible=false
+          spreadsheet_match=false
+          worksheet_found=false
+          sheet_count=0
+
+          if [[ "$http_status" == 200 ]]; then
+            metadata_accessible=true
+            read -r spreadsheet_match worksheet_found sheet_count < <(
+              python - "$response_file" "$SPREADSHEET_ID" "$EXPECTED_WORKSHEET" <<'PY'
+          import json
+          import sys
+
+          path, expected_id, expected_worksheet = sys.argv[1:]
+          with open(path, encoding="utf-8") as response:
+              payload = json.load(response)
+
+          sheets = payload.get("sheets", [])
+          titles = {
+              sheet.get("properties", {}).get("title")
+              for sheet in sheets
+          }
+          print(
+              str(payload.get("spreadsheetId") == expected_id).lower(),
+              str(expected_worksheet in titles).lower(),
+              len(sheets),
+          )
+          PY
+            )
+          fi
+
+          metadata_test_status=failure
+          if [[ "$metadata_accessible" == true && "$spreadsheet_match" == true && "$worksheet_found" == true ]]; then
+            metadata_test_status=success
+          fi
+
+          {
+            echo "metadata_test_status: $metadata_test_status"
+            echo "metadata_accessible: $metadata_accessible"
+            echo "spreadsheet_match: $spreadsheet_match"
+            echo "worksheet_found: $worksheet_found"
+            echo "sheet_count: $sheet_count"
+            echo "http_status: $http_status"
+            echo "rows_read: 0"
+            echo "rows_written: 0"
+            echo "timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "workflow_run_id: $GITHUB_RUN_ID"
+            echo "commit_sha: $GITHUB_SHA"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$metadata_test_status" != success ]]; then
+            echo "Read-only metadata verification failed. Check Sheet sharing, spreadsheet ID, worksheet name, Sheets API status, and staging WIF configuration." >&2
+            exit 1
+          fi
