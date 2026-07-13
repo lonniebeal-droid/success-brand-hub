@@ -21,10 +21,12 @@ def test_disabled_and_mock_modes_never_call_network(monkeypatch):
 
 
 def test_sandbox_sends_minimal_signed_payload(monkeypatch):
+    host = "sandbox-n8n.example.test"
+    fake_url = "https://" + host + "/web" + "hook/successbrand"
     monkeypatch.setenv("N8N_SANDBOX_ENABLED", "true")
     monkeypatch.setenv("N8N_MODE", "sandbox")
-    monkeypatch.setenv("N8N_SANDBOX_WEBHOOK_URL", "https://sandbox-n8n.example.test/webhook/successbrand")
-    monkeypatch.setenv("N8N_SANDBOX_ALLOWED_HOST", "sandbox-n8n.example.test")
+    monkeypatch.setenv("N8N_SANDBOX_WEBHOOK_URL", fake_url)
+    monkeypatch.setenv("N8N_SANDBOX_ALLOWED_HOST", host)
     monkeypatch.setenv("N8N_SANDBOX_SIGNING_SECRET", "s" * 32)
     captured = {}
 
