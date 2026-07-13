@@ -22,7 +22,9 @@ def test_application_write_is_staging_only_and_synthetic():
     assert "5550000199" in content
     assert "test@example.com" in content
     assert "versions access latest" in content
-    assert "print-identity-token" in content
+    assert "token_format: id_token" in content
+    assert "id_token_audience: ${{ env.SERVICE_URL }}" in content
+    assert "print-identity-token" not in content
 
 
 def test_cloud_run_reads_admin_token_from_secret_manager():
