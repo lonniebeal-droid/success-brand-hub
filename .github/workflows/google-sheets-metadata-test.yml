@@ -44,6 +44,7 @@ jobs:
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
           project_id: ${{ vars.GCP_PROJECT_ID }}
           create_credentials_file: true
+          access_token_scopes: https://www.googleapis.com/auth/spreadsheets.readonly
 
       - name: Set up Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v3
