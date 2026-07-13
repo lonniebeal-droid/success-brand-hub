@@ -1,12 +1,12 @@
 agent:
   name: "Content"
   slug: "content"
-  status: "planned"
-  active: false
+  status: "pilot"
+  active: true
   reports_to: "michelle"
   hierarchy:
     - ceo
     - ju
     - michelle
     - content
-  notes: "Scaffolded documentation only. Not yet operational."
+  notes: "Draft-only content pipeline pilot. Publishing remains disabled and requires human approval."
