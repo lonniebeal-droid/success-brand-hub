@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   staging:
@@ -36,6 +37,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TARGET_SHA }}
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
