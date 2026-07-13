@@ -70,7 +70,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gcloud beta run services remove-iam-policy-binding "$SERVICE_NAME" \
+          gcloud run services remove-iam-policy-binding "$SERVICE_NAME" \
             --project "$GCP_PROJECT_ID" \
             --region "$REGION" \
             --member allUsers \
