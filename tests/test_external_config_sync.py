@@ -44,7 +44,7 @@ def test_validation_rejects_sensitive_config(payload, message):
 
 
 def test_redaction_handles_nested_make_blueprint_string():
-    value = json.dumps({"modules": [{"parameters": {"webhook_url": "https://hooks.example.com/secret"}}]})
+    value = json.dumps({"modules": [{"parameters": {"webhook_url": "https://example.invalid/callback"}}]})
     redacted = json.loads(redact(value))
     assert redacted["modules"][0]["parameters"]["webhook_url"] == "__REDACTED__"
 
