@@ -84,4 +84,4 @@ class GoogleSheetsSandboxService:
             successes = session.scalar(select(func.count()).select_from(GoogleSheetsSandboxWrite).where(GoogleSheetsSandboxWrite.status.in_(["mock", "written"]))) or 0
             failures = session.scalar(select(func.count()).select_from(GoogleSheetsSandboxWrite).where(GoogleSheetsSandboxWrite.status == "failed")) or 0
             last = session.scalar(select(GoogleSheetsSandboxWrite).order_by(GoogleSheetsSandboxWrite.created_at.desc()).limit(1))
-        return {**self.adapter.status(), "last_sandbox_write": last.created_at.isoformat() if last else None, "last_error": last.error_code if last and last.status == "failed" else None, "success_count": successes, "failure_count": failures}
+        return {**self.adapter.status(), "last_success": last.created_at.isoformat() if last and last.status in {"mock", "written"} else None, "last_error_safe": last.error_code if last and last.status == "failed" else None, "success_count": successes, "failure_count": failures}

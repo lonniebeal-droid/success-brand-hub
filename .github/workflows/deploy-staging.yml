@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   staging:
@@ -29,13 +30,20 @@ jobs:
       JESSE_N8N_BASE_URL: ${{ secrets.JESSE_N8N_BASE_URL }}
       JESSE_N8N_API_KEY: ${{ secrets.JESSE_N8N_API_KEY }}
       JESSE_N8N_STAGING_WORKFLOW_ID: ${{ secrets.JESSE_N8N_STAGING_WORKFLOW_ID }}
-      JESSE_GOOGLE_CREDENTIALS_JSON: ${{ secrets.JESSE_GOOGLE_CREDENTIALS_JSON }}
       JESSE_GOOGLE_STAGING_CALENDAR_ID: ${{ secrets.JESSE_GOOGLE_STAGING_CALENDAR_ID }}
       JESSE_GOOGLE_STAGING_SHEET_ID: ${{ secrets.JESSE_GOOGLE_STAGING_SHEET_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TARGET_SHA }}
+      - name: Authenticate to Google Cloud with WIF
+        if: vars.GCP_PROJECT_ID != '' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT != ''
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

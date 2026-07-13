@@ -45,6 +45,7 @@ def test_sandbox_mode_mocked_transport_redacts_and_retries():
         if len(attempts) == 1: raise RuntimeError("temporary")
         return {"updatedRange": "Sandbox Leads!A2:J2"}
     adapter = GoogleSheetsAdapter(True, "sandbox", "A_valid_sandbox_spreadsheet_123", "Sandbox Leads", credentials(), transport, max_retries=2)
+    adapter._load_credentials = lambda: (object(), "test-project")
     result = adapter.append_row(row())
     assert result["status"] == "written" and len(attempts) == 2
     values = attempts[-1]["values"]
@@ -104,13 +105,15 @@ def test_permissions_status_and_safe_errors(db, monkeypatch):
 def test_no_secrets_logged(caplog):
     secret = "private-key-material-must-not-log"
     adapter = GoogleSheetsAdapter(True, "sandbox", "A_valid_sandbox_spreadsheet_123", "Sandbox Leads", credentials().replace("test-only-key", secret), lambda **kwargs: (_ for _ in ()).throw(RuntimeError(secret)), max_retries=0)
+    adapter._load_credentials = lambda: (object(), "test-project")
     with pytest.raises(GoogleSheetsSandboxError): adapter.append_row(row())
     assert secret not in caplog.text
 
 
 def test_failed_write_is_counted_safely(db):
     adapter = GoogleSheetsAdapter(True, "sandbox", "A_valid_sandbox_spreadsheet_123", "Sandbox Leads", credentials(), lambda **kwargs: (_ for _ in ()).throw(RuntimeError("transport failed")), max_retries=0)
+    adapter._load_credentials = lambda: (object(), "test-project")
     service = GoogleSheetsSandboxService(db, adapter)
     with pytest.raises(GoogleSheetsSandboxError): service._write("crm", "lead-failure", "request-failure", row())
     status = service.status()
-    assert status["failure_count"] == 1 and status["last_error"] == "write_failed"
+    assert status["failure_count"] == 1 and status["last_error_safe"] == "write_failed"
