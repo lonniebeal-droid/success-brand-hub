@@ -1,0 +1,96 @@
+name: Content Vertex Controlled Pilot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: content-vertex-controlled-pilot
+  cancel-in-progress: false
+
+jobs:
+  generate-and-archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      GOOGLE_CLOUD_LOCATION: global
+      CONTENT_GENERATION_MODE: vertex
+      CONTENT_VERTEX_MODEL: gemini-2.5-flash
+      CONTENT_STORAGE_MODE: gcs
+      CONTENT_ASSET_BUCKET: ${{ vars.CONTENT_ASSET_BUCKET }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install content pilot dependencies
+        run: python -m pip install --requirement requirements.txt
+
+      - name: Generate and archive one review-only draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$GCP_PROJECT_ID"
+          test -n "$CONTENT_ASSET_BUCKET"
+          python -m agents.content.cli \
+            "building confidence through one small daily action" \
+            --audience "adults working toward personal growth" \
+            --goal "educate and encourage without medical claims" \
+            --platform "short-form video" \
+            --quantity 1 \
+            --archive \
+            --campaign "vertex staging pilot" > pilot-result.json
+
+      - name: Verify pilot safety contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(Path("pilot-result.json").read_text())
+          batch = result["batch"]
+          archive = result["archive"]
+          assert batch["mode"] == "vertex"
+          assert len(batch["drafts"]) == 1
+          draft = batch["drafts"][0]
+          assert draft["approval_status"] == "draft"
+          assert draft["requires_human_approval"] is True
+          assert archive["mode"] == "gcs"
+          assert archive["public"] is False
+          assert archive["uri"].startswith("gs://")
+          print(f"Vertex draft archived privately: {archive['uri']}")
+          PY
+
+      - name: Record pilot result
+        if: success()
+        shell: bash
+        run: |
+          uri="$(python -c 'import json; print(json.load(open("pilot-result.json"))["archive"]["uri"])')"
+          {
+            echo '## Vertex content pilot'
+            echo "- Object: \`$uri\`"
+            echo '- Environment: staging'
+            echo '- Model: `gemini-2.5-flash`'
+            echo '- Drafts generated: 1'
+            echo '- Human approval: required'
+            echo '- Public access: false'
+            echo '- Publishing: disabled'
+          } >> "$GITHUB_STEP_SUMMARY"
