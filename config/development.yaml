@@ -1,0 +1,5 @@
+environment: development
+deployment_mode: dry-run
+external_actions_enabled: false
+approval_required: false
+data_store: local-json

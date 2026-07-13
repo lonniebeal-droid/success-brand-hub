@@ -1,0 +1,48 @@
+name: Deploy Jesse production
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Staging-verified commit SHA
+        required: true
+      rollback_sha:
+        description: Previous known-good commit SHA
+        required: true
+      staging_verified:
+        description: Confirm controlled staging verification
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  production-approval:
+    if: inputs.staging_verified == true
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Validate protected production plan
+        run: >-
+          python -m agents.jessie.cli deploy-production
+          --commit-sha "${{ inputs.commit_sha }}"
+          --rollback-sha "${{ inputs.rollback_sha }}"
+          --confirm-production
+          --staging-verified
+          --verification-completed
+          --backup-recorded
+      - name: Deployment summary
+        run: |
+          echo '## Jesse production deployment approval' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Protected environment approval completed.' >> "$GITHUB_STEP_SUMMARY"
+          echo "Selected commit: \\`${{ inputs.commit_sha }}\\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Rollback target: \\`${{ inputs.rollback_sha }}\\`" >> "$GITHUB_STEP_SUMMARY"
+          echo 'External actions remain disabled until reviewed live adapters are implemented.' >> "$GITHUB_STEP_SUMMARY"

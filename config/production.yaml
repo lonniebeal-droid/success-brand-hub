@@ -1,0 +1,5 @@
+environment: production
+deployment_mode: production
+external_actions_enabled: false
+approval_required: true
+resources: placeholders-from-github-environment-secrets

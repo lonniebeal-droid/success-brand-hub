@@ -1,0 +1,45 @@
+name: Jesse tests and build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: pip install -r requirements.txt
+      - run: npm ci
+      - name: Test Jesse
+        run: python -m pytest agents/jessie/tests -q
+      - name: Build Astro
+        env:
+          ASTRO_TELEMETRY_DISABLED: "1"
+        run: npm run build
+      - name: Secret and private-data scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -nE '(sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|https://[^ ]*(webhook|hooks))' -- ':!package-lock.json' ':!node_modules'; then
+            echo 'Potential secret detected.' >&2
+            exit 1
+          fi
+          if grep -R -nE 'JESSE_DASHBOARD_TOKEN|JESSE_(ADMIN|TWILIO|ELEVENLABS|N8N|GOOGLE)_TOKEN' dist; then
+            echo 'A token name leaked into public build output.' >&2
+            exit 1
+          fi

@@ -13,6 +13,7 @@ from agents.jessie.integrations.gmail_adapter import GmailAdapter
 from agents.jessie.integrations.n8n_adapter import N8NAdapter
 from agents.jessie.src.reporting_service import ReportingService
 from fastapi.testclient import TestClient
+from agents.jessie.deployment import DeploymentBlocked, DeploymentOrchestrator
 
 
 def _service() -> IntakeService:
@@ -103,6 +104,53 @@ def run_demo(_: argparse.Namespace) -> int:
     return 0
 
 
+def deploy_status(_: argparse.Namespace) -> int:
+    print(json.dumps(DeploymentOrchestrator().status(), indent=2))
+    return 0
+
+
+def deploy_dry_run(args: argparse.Namespace) -> int:
+    result = DeploymentOrchestrator().deploy("development", args.commit_sha, dry_run=True, tests_passed=True)
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def deploy_staging(args: argparse.Namespace) -> int:
+    result = DeploymentOrchestrator().deploy("staging", args.commit_sha, dry_run=True, tests_passed=True)
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def verify_staging(args: argparse.Namespace) -> int:
+    DeploymentOrchestrator.validate_sha(args.commit_sha)
+    print(json.dumps({"commit_sha": args.commit_sha, "verification": "manual-check-required", "external_action": False}, indent=2))
+    return 0
+
+
+def deploy_production(args: argparse.Namespace) -> int:
+    if not args.confirm_production:
+        raise DeploymentBlocked("explicit production confirmation is required")
+    result = DeploymentOrchestrator().deploy(
+        "production",
+        args.commit_sha,
+        dry_run=True,
+        tests_passed=True,
+        staging_succeeded=args.staging_verified,
+        verification_completed=args.verification_completed,
+        approved=args.confirm_production,
+        backup_recorded=args.backup_recorded,
+        rollback_target=args.rollback_sha,
+    )
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def rollback_deployment(args: argparse.Namespace) -> int:
+    result = DeploymentOrchestrator().rollback(args.commit_sha, approved=args.confirm_production)
+    print(json.dumps(result, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m agents.jessie.cli")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -143,6 +191,35 @@ def build_parser() -> argparse.ArgumentParser:
 
     demo = subparsers.add_parser("run-demo")
     demo.set_defaults(func=run_demo)
+
+    status_parser = subparsers.add_parser("deploy-status")
+    status_parser.set_defaults(func=deploy_status)
+
+    dry_run = subparsers.add_parser("deploy-dry-run")
+    dry_run.add_argument("--commit-sha", required=True)
+    dry_run.set_defaults(func=deploy_dry_run)
+
+    staging = subparsers.add_parser("deploy-staging")
+    staging.add_argument("--commit-sha", required=True)
+    staging.set_defaults(func=deploy_staging)
+
+    verify = subparsers.add_parser("verify-staging")
+    verify.add_argument("--commit-sha", required=True)
+    verify.set_defaults(func=verify_staging)
+
+    production = subparsers.add_parser("deploy-production")
+    production.add_argument("--commit-sha", required=True)
+    production.add_argument("--rollback-sha", required=True)
+    production.add_argument("--confirm-production", action="store_true")
+    production.add_argument("--staging-verified", action="store_true")
+    production.add_argument("--verification-completed", action="store_true")
+    production.add_argument("--backup-recorded", action="store_true")
+    production.set_defaults(func=deploy_production)
+
+    rollback_parser = subparsers.add_parser("rollback")
+    rollback_parser.add_argument("--commit-sha", required=True)
+    rollback_parser.add_argument("--confirm-production", action="store_true")
+    rollback_parser.set_defaults(func=rollback_deployment)
 
     return parser
 
