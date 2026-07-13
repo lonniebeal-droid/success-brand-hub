@@ -55,7 +55,6 @@ jobs:
             --project "$GCP_PROJECT_ID" \
             --region "$REGION" \
             --platform managed \
-            --allow-unauthenticated \
             --min-instances 0 \
             --max-instances 1 \
             --cpu 1 \
