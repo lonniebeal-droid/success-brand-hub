@@ -34,6 +34,7 @@ from crm.router import create_crm_router
 from callcenter.router import create_callcenter_router
 from integrations.google_sheets_sandbox.router import create_google_sheets_router
 from integrations.sandbox_providers import create_sandbox_provider_router
+from integrations.google_calendar_sandbox import create_google_calendar_router
 
 
 class LoginRequest(BaseModel):
@@ -107,6 +108,7 @@ def create_app(database: Database | None = None) -> FastAPI:
     app.include_router(create_callcenter_router(db))
     app.include_router(create_google_sheets_router(db))
     app.include_router(create_sandbox_provider_router())
+    app.include_router(create_google_calendar_router())
 
     @app.middleware("http")
     async def integration_request_id(request, call_next):
