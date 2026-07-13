@@ -68,6 +68,23 @@ python -m agents.content.cli "building confidence" --quantity 3
 
 Vertex mode is opt-in so tests and ordinary staging runs cannot spend credits accidentally. The default model is `gemini-2.5-flash`; override it with `CONTENT_VERTEX_MODEL`.
 
+Archive a batch locally for a cost-free test:
+
+```bash
+CONTENT_STORAGE_MODE=local python -m agents.content.cli "building confidence" --archive --campaign "Confidence Pilot"
+```
+
+Archive to a private Cloud Storage bucket using Application Default Credentials:
+
+```bash
+export CONTENT_STORAGE_MODE=gcs
+export CONTENT_ASSET_BUCKET=success-brand-staging-content
+export GOOGLE_CLOUD_PROJECT=success-brand-staging
+python -m agents.content.cli "building confidence" --archive --campaign "Confidence Pilot"
+```
+
+The GCS adapter refuses to upload unless uniform bucket-level access and public access prevention are both enforced. Objects are stored as versioned JSON paths, use create-only generation preconditions, carry draft/retention metadata, and never trigger publishing.
+
 ## Known Limitations
 - No publishing or distribution system is connected
 - No approved brand guideline document exists yet to check against
