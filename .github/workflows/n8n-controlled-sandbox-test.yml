@@ -1,0 +1,57 @@
+name: n8n controlled sandbox test
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type TRIGGER SYNTHETIC N8N TEST
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  trigger-one-synthetic-event:
+    environment: staging
+    runs-on: ubuntu-latest
+    env:
+      WEBHOOK_URL: ${{ secrets.N8N_SANDBOX_WEBHOOK_URL }}
+      SIGNING_SECRET: ${{ secrets.N8N_SANDBOX_SIGNING_SECRET }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Trigger one signed synthetic event
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CONFIRMATION" = 'TRIGGER SYNTHETIC N8N TEST'
+          test -n "$WEBHOOK_URL"
+          test -n "$SIGNING_SECRET"
+          payload=$(python - <<'PY'
+          import json, os
+          print(json.dumps({
+              "schema_version": "n8n_sandbox_v1",
+              "operation": "health_check",
+              "record_id": "synthetic-health-check",
+              "request_id": "github-run-" + os.environ["GITHUB_RUN_ID"],
+              "synthetic": True,
+          }, sort_keys=True, separators=(",", ":")))
+          PY
+          )
+          signature=$(PAYLOAD="$payload" python - <<'PY'
+          import hashlib, hmac, os
+          print(hmac.new(os.environ["SIGNING_SECRET"].encode(), os.environ["PAYLOAD"].encode(), hashlib.sha256).hexdigest())
+          PY
+          )
+          curl --fail-with-body --silent --show-error \
+            -X POST "$WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -H "X-SuccessBrand-Signature: sha256=$signature" \
+            -H "X-Request-ID: github-run-$GITHUB_RUN_ID" \
+            --data "$payload" >/dev/null
+          {
+            echo 'n8n_test_status: success'
+            echo 'synthetic_events_sent: 1'
+            echo 'client_data_sent: false'
+            echo 'sandbox_feature_enabled: false'
+          } >> "$GITHUB_STEP_SUMMARY"

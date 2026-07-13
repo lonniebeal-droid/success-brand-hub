@@ -1,0 +1,35 @@
+name: ElevenLabs sandbox authentication readiness
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-agent-read-only:
+    environment: staging
+    runs-on: ubuntu-latest
+    env:
+      API_KEY: ${{ secrets.ELEVENLABS_SANDBOX_API_KEY }}
+      AGENT_ID: ${{ vars.ELEVENLABS_SANDBOX_AGENT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify staging agent exists without starting a conversation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$API_KEY"
+          test -n "$AGENT_ID"
+          status=$(curl --silent --show-error --output /tmp/elevenlabs-response --write-out '%{http_code}' \
+            -H "xi-api-key: $API_KEY" \
+            "https://api.elevenlabs.io/v1/convai/agents/$AGENT_ID")
+          test "$status" = 200
+          rm -f /tmp/elevenlabs-response
+          {
+            echo 'authentication_status: success'
+            echo 'agent_found: true'
+            echo 'conversations_started: 0'
+            echo 'audio_generated: false'
+            echo 'sandbox_feature_enabled: false'
+          } >> "$GITHUB_STEP_SUMMARY"

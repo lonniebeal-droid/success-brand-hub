@@ -1,0 +1,34 @@
+name: Twilio sandbox authentication readiness
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-authentication-only:
+    environment: staging
+    runs-on: ubuntu-latest
+    env:
+      ACCOUNT_SID: ${{ secrets.TWILIO_SANDBOX_ACCOUNT_SID }}
+      AUTH_TOKEN: ${{ secrets.TWILIO_SANDBOX_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify Twilio account access without calling or messaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT_SID"
+          test -n "$AUTH_TOKEN"
+          status=$(curl --silent --show-error --output /tmp/twilio-response --write-out '%{http_code}' \
+            -u "$ACCOUNT_SID:$AUTH_TOKEN" \
+            "https://api.twilio.com/2010-04-01/Accounts/$ACCOUNT_SID.json")
+          test "$status" = 200
+          rm -f /tmp/twilio-response
+          {
+            echo 'authentication_status: success'
+            echo 'calls_created: 0'
+            echo 'messages_sent: 0'
+            echo 'sandbox_feature_enabled: false'
+          } >> "$GITHUB_STEP_SUMMARY"
