@@ -133,3 +133,40 @@ Before any live change:
 5. Run a controlled test with fake data.
 6. Record evidence and unresolved follow-up in the Google Doc.
 7. Mirror engineering/configuration details in this GitHub file or a linked repository document.
+
+
+## July 13, 2026 — exact-match calendar workflow repair
+
+### Cancellation handler
+
+- Google Calendar search is restricted to the `support@successbrand.org` primary calendar.
+- The search window is five minutes before through five minutes after the exact original appointment timestamp.
+- The search query includes the caller name.
+- The result limit is one.
+- Jesse's `cancel_appointment` tool requires `appointment_time` as a full ISO 8601 datetime with an America/New_York offset.
+- The scenario remains **Inactive** pending controlled verification.
+
+### Reschedule handler
+
+- The same calendar, exact-time window, caller-name query, and one-result limit were applied.
+- Jesse's `reschedule_appointment` tool now sends:
+  - `appointment_time` for the original event
+  - `new_time_iso` for the requested replacement time
+- Both values must be full ISO 8601 datetimes with America/New_York offsets.
+- Webhook acceptance is explicitly not proof that the appointment moved.
+- Jesse may announce completion only after the old event is uniquely matched and the calendar update succeeds.
+- The scenario remains **Inactive** pending controlled verification.
+
+### Required controlled test
+
+1. Create one synthetic appointment on the support calendar using fake data.
+2. Place unrelated events outside the exact search window.
+3. Run one cancellation request and verify exactly one intended event is affected.
+4. Recreate a synthetic appointment and run one reschedule request.
+5. Verify exactly one intended event moves and all unrelated events remain untouched.
+6. Verify Jesse gives one short outcome sentence and immediately invokes **End conversation** when the caller says goodbye.
+7. Record the test evidence in the support-owned canonical Google Doc before reactivation.
+
+### Rollback and safety
+
+If any lookup returns zero or multiple intended matches, or any request affects more than one event, keep both scenarios inactive and route the request to office follow-up. Exact external scenario, run, webhook, and conversation identifiers remain only in the private canonical Google Doc.
