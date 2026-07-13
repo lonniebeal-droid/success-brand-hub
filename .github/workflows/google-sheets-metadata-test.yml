@@ -38,12 +38,14 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Authenticate to Google Cloud with WIF
+        id: google-auth
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
           project_id: ${{ vars.GCP_PROJECT_ID }}
           create_credentials_file: true
+          token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/spreadsheets.readonly
           access_token_scopes: https://www.googleapis.com/auth/spreadsheets.readonly
 
@@ -173,21 +175,19 @@ jobs:
           create_credentials_file: true
           access_token_scopes: https://www.googleapis.com/auth/spreadsheets.readonly
 
-      - name: Set up Google Cloud CLI
-        uses: google-github-actions/setup-gcloud@v3
-
       - name: Verify read-only spreadsheet metadata
         shell: bash
         env:
           SPREADSHEET_ID: ${{ vars.GOOGLE_SHEETS_SPREADSHEET_ID }}
           EXPECTED_WORKSHEET: ${{ vars.GOOGLE_SHEETS_WORKSHEET_NAME }}
+          GOOGLE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
         run: |
           set -euo pipefail
 
           response_file="$(mktemp)"
           trap 'rm -f "$response_file"' EXIT
 
-          access_token="$(gcloud auth application-default print-access-token)"
+          access_token="$GOOGLE_ACCESS_TOKEN"
           http_status="$(curl --silent --show-error \
             --output "$response_file" \
             --write-out '%{http_code}' \
