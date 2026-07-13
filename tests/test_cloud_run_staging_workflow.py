@@ -20,6 +20,7 @@ def test_cloud_run_staging_is_private_and_tightly_scaled() -> None:
     assert "--gpu" not in workflow
     assert 'public_status' in workflow
     assert '"401"' in workflow and '"403"' in workflow
+    assert "print-identity-token" not in workflow
 
 
 def test_cloud_run_staging_keeps_integrations_disabled() -> None:
