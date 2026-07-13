@@ -189,3 +189,25 @@ These results are user-verified from direct calendar observation during controll
 ### Monitoring requirement
 
 Continue monitoring live calls. If a duplicate event, missing event, wrong time, repeated confirmation, false success statement, or failure to invoke **End conversation** occurs, preserve the call time and private conversation identifier, disable the affected automation, and document the incident in the canonical support-owned Google Doc.
+
+
+## July 13, 2026 — GitHub control layer for Make and ElevenLabs
+
+### Change prepared
+
+- Added reviewed JSON manifest locations for Jesse's ElevenLabs agent and the Make appointment, cancellation, and reschedule scenarios.
+- Added a read-only export workflow that fetches current provider configuration, redacts credentials and outbound URLs, and retains the artifact for seven days.
+- Added pull-request validation for supported patch fields, JSON shape, credential-like fields, webhook URLs, and unresolved redaction placeholders.
+- Added a manual deployment workflow that defaults to dry run, uses GitHub environment-scoped credentials, and requires protected-environment approval plus an explicit `DEPLOY` confirmation for production.
+- Added unit tests for provider endpoints, redaction, allowlisted Make hosts, dry-run privacy, and PATCH behavior.
+
+### Safety state
+
+- No Make or ElevenLabs credential was added to GitHub.
+- No provider configuration was changed by this repository update.
+- All tracked manifests are empty safe placeholders and cannot be applied until a redacted export is reviewed and an approved patch is committed.
+- Production remains protected by GitHub environment approval.
+
+### Required setup before first staging deployment
+
+Add the provider API tokens as GitHub environment secrets and the agent/scenario identifiers as GitHub environment variables, run a read-only export, review the artifact, and merge only the intended safe configuration patch. Then run dry run first and test staging with fake data before any production approval.

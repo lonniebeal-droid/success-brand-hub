@@ -1,0 +1,7 @@
+{
+  "payload": {},
+  "provider": "elevenlabs",
+  "resource_id_env": "ELEVENLABS_AGENT_ID",
+  "schema_version": 1,
+  "target": "staging"
+}

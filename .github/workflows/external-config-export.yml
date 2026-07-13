@@ -1,0 +1,71 @@
+name: Export Make or ElevenLabs config
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: Provider to read
+        required: true
+        type: choice
+        options: [elevenlabs, make]
+      target:
+        description: GitHub environment containing that provider's identifiers
+        required: true
+        type: choice
+        options: [staging, production]
+      resource_id_env:
+        description: Approved resource ID variable name
+        required: true
+        type: choice
+        options:
+          - ELEVENLABS_AGENT_ID
+          - MAKE_APPOINTMENT_SCENARIO_ID
+          - MAKE_CANCELLATION_SCENARIO_ID
+          - MAKE_RESCHEDULE_SCENARIO_ID
+
+permissions:
+  contents: read
+
+jobs:
+  export-read-only:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    env:
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY || secrets.ELEVENLABS_SANDBOX_API_KEY }}
+      ELEVENLABS_AGENT_ID: ${{ vars.ELEVENLABS_AGENT_ID || vars.ELEVENLABS_SANDBOX_AGENT_ID }}
+      ELEVENLABS_BRANCH_ID: ${{ vars.ELEVENLABS_BRANCH_ID }}
+      MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+      MAKE_API_BASE_URL: ${{ vars.MAKE_API_BASE_URL }}
+      MAKE_APPOINTMENT_SCENARIO_ID: ${{ vars.MAKE_APPOINTMENT_SCENARIO_ID }}
+      MAKE_CANCELLATION_SCENARIO_ID: ${{ vars.MAKE_CANCELLATION_SCENARIO_ID }}
+      MAKE_RESCHEDULE_SCENARIO_ID: ${{ vars.MAKE_RESCHEDULE_SCENARIO_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Export and redact provider config
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/external_config_sync.py export \
+            --provider "${{ inputs.provider }}" \
+            --target "${{ inputs.target }}" \
+            --resource-id-env "${{ inputs.resource_id_env }}" \
+            --output "exported/${{ inputs.provider }}-${{ inputs.target }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: redacted-${{ inputs.provider }}-${{ inputs.target }}-${{ github.run_id }}
+          path: exported/*.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Safe summary
+        run: |
+          {
+            echo '## External config export'
+            echo 'Read-only provider request: complete'
+            echo 'Tracked files changed: false'
+            echo 'External resources changed: false'
+            echo 'Secrets included in artifact: false'
+            echo 'Review the artifact before copying an approved patch into config/external.'
+          } >> "$GITHUB_STEP_SUMMARY"

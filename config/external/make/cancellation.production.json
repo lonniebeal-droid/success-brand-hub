@@ -1,0 +1,7 @@
+{
+  "payload": {},
+  "provider": "make",
+  "resource_id_env": "MAKE_CANCELLATION_SCENARIO_ID",
+  "schema_version": 1,
+  "target": "production"
+}
