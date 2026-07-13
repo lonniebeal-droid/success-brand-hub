@@ -1,0 +1,147 @@
+name: Content Review Decision
+
+on:
+  workflow_dispatch:
+    inputs:
+      archive_uri:
+        description: Private gs:// URI from a Content Vertex Controlled Pilot run
+        required: true
+        type: string
+      decision:
+        description: Human review outcome; this never publishes content
+        required: true
+        type: choice
+        options:
+          - approve
+          - reject
+      review_note:
+        description: Required explanation or approval note
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: content-review-decision-${{ inputs.archive_uri }}
+  cancel-in-progress: false
+
+jobs:
+  record-decision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      CONTENT_ASSET_BUCKET: ${{ vars.CONTENT_ASSET_BUCKET }}
+      ARCHIVE_URI: ${{ inputs.archive_uri }}
+      REVIEW_DECISION: ${{ inputs.decision }}
+      REVIEW_NOTE: ${{ inputs.review_note }}
+      REVIEWER: ${{ github.actor }}
+      REVIEW_RUN_ID: ${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install decision-record dependencies
+        run: python -m pip install --requirement requirements.txt
+
+      - name: Validate and record immutable review decision
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from datetime import UTC, datetime
+          from pathlib import Path
+
+          from google.cloud import storage
+
+          bucket_name = os.environ["CONTENT_ASSET_BUCKET"]
+          archive_uri = os.environ["ARCHIVE_URI"].strip()
+          decision = os.environ["REVIEW_DECISION"].strip()
+          note = os.environ["REVIEW_NOTE"].strip()
+          reviewer = os.environ["REVIEWER"].strip()
+          run_id = os.environ["REVIEW_RUN_ID"].strip()
+          expected_prefix = f"gs://{bucket_name}/content/"
+
+          if not archive_uri.startswith(expected_prefix):
+              raise SystemExit("archive_uri must reference a private content archive in the staging bucket")
+          if decision not in {"approve", "reject"}:
+              raise SystemExit("decision must be approve or reject")
+          if not note:
+              raise SystemExit("review_note is required")
+          if not reviewer:
+              raise SystemExit("GitHub reviewer identity is required")
+
+          client = storage.Client(project=os.environ["GOOGLE_CLOUD_PROJECT"])
+          bucket = client.get_bucket(bucket_name)
+          if not bucket.iam_configuration.uniform_bucket_level_access_enabled:
+              raise SystemExit("content bucket must use uniform bucket-level access")
+          if bucket.iam_configuration.public_access_prevention != "enforced":
+              raise SystemExit("content bucket must enforce public access prevention")
+
+          archive_id = hashlib.sha256(archive_uri.encode()).hexdigest()
+          object_name = f"content-reviews/{archive_id}/{run_id}.json"
+          record = {
+              "schema_version": "successbrand_content_review_decision_v1",
+              "archive_uri": archive_uri,
+              "decision": decision,
+              "reviewer": reviewer,
+              "review_note": note,
+              "recorded_at": datetime.now(UTC).isoformat(),
+              "github_run_id": run_id,
+              "publishing_enabled": False,
+              "publishing_authorized": False,
+          }
+          Path("review-decision.json").write_text(json.dumps(record, indent=2, sort_keys=True))
+          blob = bucket.blob(object_name)
+          blob.metadata = {
+              "decision": decision,
+              "reviewer": reviewer,
+              "publishing_enabled": "false",
+              "schema_version": "successbrand_content_review_decision_v1",
+          }
+          blob.upload_from_filename(
+              "review-decision.json",
+              content_type="application/json",
+              if_generation_match=0,
+              checksum="auto",
+              timeout=30,
+          )
+          print(f"Recorded {decision} decision at gs://{bucket_name}/{object_name}")
+          PY
+
+      - name: Upload decision receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: successbrand-content-review-decision-${{ github.run_id }}
+          path: review-decision.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Record safe outcome
+        shell: bash
+        run: |
+          {
+            echo '## Content review decision'
+            echo "- Decision: \`${REVIEW_DECISION}\`"
+            echo "- Reviewer: \`${REVIEWER}\`"
+            echo '- Publishing: disabled'
+            echo '- Decision record: private and immutable'
+          } >> "$GITHUB_STEP_SUMMARY"
