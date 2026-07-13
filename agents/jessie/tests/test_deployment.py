@@ -4,6 +4,7 @@ import pytest
 
 from agents.jessie.cli import build_parser
 from agents.jessie.deployment.base import DeploymentAdapter, DeploymentError
+from agents.jessie.deployment.google import GoogleDeployment
 from agents.jessie.deployment.orchestrator import DeploymentBlocked, DeploymentOrchestrator
 
 
@@ -35,6 +36,22 @@ def test_staging_validates_with_configured_secret(manifest, monkeypatch):
     result = DeploymentOrchestrator(manifest, [adapter]).deploy("staging", SHA, tests_passed=True)
     assert result["adapters"][0]["valid"] is True
     assert "not-logged" not in json.dumps(result)
+
+
+def test_google_staging_validation_uses_adc_variables(monkeypatch):
+    expected = {
+        "GCP_PROJECT_ID": "success-brand-staging",
+        "GOOGLE_AUTH_MODE": "adc",
+        "GOOGLE_SHEETS_MODE": "sandbox",
+        "GOOGLE_SHEETS_SANDBOX_ENABLED": "true",
+        "GOOGLE_SHEETS_SPREADSHEET_ID": "sandbox-sheet-id",
+        "GOOGLE_SHEETS_WORKSHEET_NAME": "Sandbox Leads",
+    }
+    for name, value in expected.items():
+        monkeypatch.setenv(name, value)
+    validation = GoogleDeployment().validate("staging")
+    assert validation["valid"] is True
+    assert "JESSE_GOOGLE_CREDENTIALS_JSON" not in GoogleDeployment().required_variables
 
 
 def test_production_requires_all_approvals(manifest):
