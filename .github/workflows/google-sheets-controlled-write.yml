@@ -1,0 +1,112 @@
+name: Google Sheets controlled sandbox write
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  write-one-fake-row:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Authenticate to Google Cloud with WIF
+        id: google-auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/spreadsheets
+
+      - name: Append exactly one fake sandbox row
+        shell: bash
+        env:
+          SPREADSHEET_ID: ${{ vars.GOOGLE_SHEETS_SPREADSHEET_ID }}
+          WORKSHEET_NAME: ${{ vars.GOOGLE_SHEETS_WORKSHEET_NAME }}
+          GOOGLE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+        run: |
+          set -euo pipefail
+
+          record_id="sandbox-controlled-write-v1"
+          request_id="controlled-write-${GITHUB_RUN_ID}"
+          encoded_sheet="$(python -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["WORKSHEET_NAME"], safe=""))')"
+          read_url="https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/'${encoded_sheet}'!B:B"
+
+          existing_file="$(mktemp)"
+          response_file="$(mktemp)"
+          trap 'rm -f "$existing_file" "$response_file"' EXIT
+
+          read_status="$(curl --silent --show-error --output "$existing_file" --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${GOOGLE_ACCESS_TOKEN}" "$read_url")"
+          if [[ "$read_status" != "200" ]]; then
+            echo "controlled_write_status: failure"
+            echo "stage: duplicate_check"
+            echo "http_status: $read_status"
+            exit 1
+          fi
+
+          if python - "$existing_file" "$record_id" <<'PY'
+          import json, sys
+          payload = json.load(open(sys.argv[1], encoding="utf-8"))
+          values = {row[0] for row in payload.get("values", []) if row}
+          raise SystemExit(0 if sys.argv[2] in values else 1)
+          PY
+          then
+            echo "controlled_write_status: skipped"
+            echo "reason: duplicate_record_id"
+            echo "record_id: $record_id"
+            echo "rows_written: 0"
+            exit 0
+          fi
+
+          created_timestamp="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          payload="$(python - "$record_id" "$created_timestamp" "$request_id" <<'PY'
+          import json, sys
+          record_id, created, request_id = sys.argv[1:]
+          row = [
+              "google_sheets_sandbox_v1",
+              record_id,
+              created,
+              "***0199",
+              "t***@example.com",
+              "appointment_inquiry",
+              "normal",
+              "new",
+              "controlled_github_test",
+              request_id,
+          ]
+          print(json.dumps({"values": [row]}, separators=(",", ":")))
+          PY
+          )"
+
+          append_url="https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/'${encoded_sheet}'!A:J:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS"
+          write_status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+            --request POST \
+            --header "Authorization: Bearer ${GOOGLE_ACCESS_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data "$payload" \
+            "$append_url")"
+
+          if [[ "$write_status" != "200" ]]; then
+            echo "controlled_write_status: failure"
+            echo "stage: append"
+            echo "http_status: $write_status"
+            exit 1
+          fi
+
+          {
+            echo "controlled_write_status: success"
+            echo "record_id: $record_id"
+            echo "rows_written: 1"
+            echo "raw_notes_written: false"
+            echo "phone_masked: true"
+            echo "email_masked: true"
+            echo "sandbox_feature_enabled: false"
+            echo "workflow_run_id: $GITHUB_RUN_ID"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
