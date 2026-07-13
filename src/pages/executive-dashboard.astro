@@ -12,8 +12,9 @@ const agents = [
 const operations = [
   ['Agent health','3 runtimes ready'],['Running tasks','0 active'],['Queue','Persistent SQLite queue'],
   ['Completed work','Tracked with duration'],['Reports','Operational summaries'],['Appointments','Conflict-safe local calendar'],
-  ['Messages','Internal priority messaging'],['Memory','Long and short term'],['Notifications','Dashboard and placeholders']
+  ['Messages','Internal priority messaging'],['Memory','Literal and local semantic retrieval'],['Notifications','Dashboard plus fail-closed email and SMS']
 ];
+const providers = ['Google Calendar','Gmail','n8n','Twilio','ElevenLabs'];
 const googleSheets = { mode: 'mock', enabled: false, lastWrite: 'None', lastError: 'None', successes: 0, failures: 0 };
 ---
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width"/><meta name="robots" content="noindex,nofollow"/><title>Success Brand Executive Dashboard</title>
@@ -24,4 +25,5 @@ const googleSheets = { mode: 'mock', enabled: false, lastWrite: 'None', lastErro
 <section class="grid">{agents.map(([name,status,description])=><article class="card agent"><div><h2>{name}</h2><p>{description}</p></div><span class:list={['pill',status.toLowerCase()]}>{status}</span></article>)}</section>
 <h2 style="margin-top:36px">Staging operations</h2><section class="grid">{operations.map(([name,description])=><article class="card"><h2>{name}</h2><p class="lede">{description}</p></article>)}</section><p><a href="/admin" style="color:#79b8ff">Open administration dashboard</a></p>
 <h2 style="margin-top:36px">Google Sheets sandbox</h2><section class="summary"><article class="card">Mode<strong class="metric">{googleSheets.mode}</strong></article><article class="card">Enabled<strong class="metric">{googleSheets.enabled ? 'Yes' : 'No'}</strong></article><article class="card">Successes<strong class="metric">{googleSheets.successes}</strong></article><article class="card">Failures<strong class="metric">{googleSheets.failures}</strong></article></section><p class="lede">Last write: {googleSheets.lastWrite} · Last error: {googleSheets.lastError}. Credentials and spreadsheet identifiers are never rendered.</p>
+<h2 style="margin-top:36px">External provider safety</h2><section class="grid">{providers.map(name=><article class="card agent"><div><h2>{name}</h2><p>Protected control plane available; account transport requires separate approval.</p></div><span class="pill planned">Disabled</span></article>)}</section>
 </main></body></html>

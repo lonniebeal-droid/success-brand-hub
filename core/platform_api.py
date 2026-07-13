@@ -28,9 +28,12 @@ from core.runtime.monitor import SystemMonitor
 from core.runtime.queue import PersistentTaskQueue
 from core.runtime.worker import BackgroundWorker
 from core.scheduling import SchedulingService
+from core.orchestration import AgentOrchestrator
+from core.content_system import SuccessBrandContentSystem
 from crm.router import create_crm_router
 from callcenter.router import create_callcenter_router
 from integrations.google_sheets_sandbox.router import create_google_sheets_router
+from integrations.sandbox_providers import create_sandbox_provider_router
 
 
 class LoginRequest(BaseModel):
@@ -74,6 +77,17 @@ class AppointmentRequest(BaseModel):
     attendee: str | None = None
 
 
+class DelegationRequest(BaseModel):
+    objective: str = Field(min_length=1, max_length=300)
+    payload: dict[str, Any] = Field(default_factory=dict)
+    priority: int = Field(default=5, ge=1, le=10)
+
+
+class ContentPackRequest(BaseModel):
+    topic: str = Field(min_length=1, max_length=120)
+    audience: str = Field(default="adults", min_length=1, max_length=80)
+
+
 def _public(model: Any) -> dict[str, Any]:
     return {column.name: getattr(model, column.name) for column in model.__table__.columns}
 
@@ -86,10 +100,13 @@ def create_app(database: Database | None = None) -> FastAPI:
     notifications = NotificationService(db)
     scheduling = SchedulingService(db)
     monitor = SystemMonitor(queue, [worker])
+    orchestrator = AgentOrchestrator(queue)
+    content_system = SuccessBrandContentSystem()
     app = FastAPI(title="Success Brand Platform v2", version="2.0.0")
     app.include_router(create_crm_router(db))
     app.include_router(create_callcenter_router(db))
     app.include_router(create_google_sheets_router(db))
+    app.include_router(create_sandbox_provider_router())
 
     @app.middleware("http")
     async def integration_request_id(request, call_next):
@@ -145,6 +162,15 @@ def create_app(database: Database | None = None) -> FastAPI:
     def create_task(payload: TaskRequest, _: dict = Depends(require_role("manager"))):
         return _public(queue.enqueue(**payload.model_dump()))
 
+    @app.post("/orchestration/delegate", status_code=201)
+    def delegate(payload: DelegationRequest, _: dict = Depends(require_role("manager"))):
+        task, decision = orchestrator.delegate(payload.objective, payload.payload, payload.priority)
+        return {"task": _public(task), "owner": decision.owner, "reason": decision.reason, "human_approval_required": True}
+
+    @app.post("/content/packs", status_code=201)
+    def create_content_pack(payload: ContentPackRequest, _: dict = Depends(require_role("agent"))):
+        return content_system.create_pack(payload.topic, payload.audience)
+
     @app.get("/tasks")
     def tasks(task_status: str | None = Query(default=None, alias="status"), _: dict = Depends(require_role("viewer"))):
         with db.session() as session:
@@ -169,6 +195,10 @@ def create_app(database: Database | None = None) -> FastAPI:
     @app.get("/memory/search")
     def search_memory(q: str, namespace: str | None = None, _: dict = Depends(require_role("viewer"))):
         return [_public(item) for item in memory.search(q, namespace)]
+
+    @app.get("/memory/semantic-search")
+    def semantic_memory(q: str, limit: int = Query(default=10, ge=1, le=50), _: dict = Depends(require_role("viewer"))):
+        return memory.semantic_search(q, limit)
 
     @app.get("/conversations/{conversation_id}")
     def conversation(conversation_id: str, _: dict = Depends(require_role("viewer"))):

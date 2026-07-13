@@ -87,9 +87,11 @@ def test_memory_notifications_and_scheduling(db):
     memory.remember("ops", "Important project update", "short_term", "chat-1")
     assert memory.search("project")[0].namespace == "ops"
     assert "Important" in memory.summarize("chat-1")
-    assert memory.semantic_search("project")["provider"] == "vector-placeholder"
+    semantic = memory.semantic_search("project")
+    assert semantic["provider"] == "local-token-cosine-v1"
+    assert semantic["available"] is True
     notification = NotificationService(db).send("ju", "Task ready", "email")
-    assert notification.status == "placeholder"
+    assert notification.status == "disabled"
     scheduling = SchedulingService(db)
     start = datetime.now(timezone.utc) + timedelta(days=1)
     appointment = scheduling.schedule("Review", start, start + timedelta(hours=1))

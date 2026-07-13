@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import os
 
 from core.database.database import Database
 from core.database.models import Notification
@@ -15,7 +16,11 @@ class NotificationService:
     def send(self, recipient: str, message: str, channel: str = "internal") -> Notification:
         if channel not in self.CHANNELS:
             raise ValueError("unsupported notification channel")
-        status = "placeholder" if channel in {"email", "sms"} else "queued"
+        mode = os.getenv(f"{channel.upper()}_DELIVERY_MODE", "disabled").casefold()
+        if channel in {"email", "sms"}:
+            status = "mock" if mode == "mock" else "disabled"
+        else:
+            status = "queued"
         record = Notification(id=str(uuid.uuid4()), recipient=recipient, message=message, channel=channel, status=status)
         with self.database.session() as session:
             session.add(record)
