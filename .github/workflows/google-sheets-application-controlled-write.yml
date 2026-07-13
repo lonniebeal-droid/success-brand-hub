@@ -15,16 +15,20 @@ jobs:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
       SERVICE_NAME: success-brand-jesse-staging
+      SERVICE_URL: https://success-brand-jesse-staging-708353059015.us-central1.run.app
       REGION: us-central1
     steps:
       - uses: actions/checkout@v5
 
       - name: Authenticate to Google Cloud
+        id: google-auth
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
           project_id: ${{ vars.GCP_PROJECT_ID }}
+          token_format: id_token
+          id_token_audience: ${{ env.SERVICE_URL }}
 
       - uses: google-github-actions/setup-gcloud@v3
 
@@ -32,19 +36,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          service_url="$(gcloud run services describe "$SERVICE_NAME" \
-            --project "$GCP_PROJECT_ID" --region "$REGION" \
-            --format='value(status.url)')"
           api_token="$(gcloud secrets versions access latest \
             --secret jesse-staging-admin-token --project "$GCP_PROJECT_ID")"
-          identity_token="$(gcloud auth print-identity-token)"
+          identity_token="${{ steps.google-auth.outputs.id_token }}"
           request_id="app-controlled-${GITHUB_RUN_ID}"
           intake_file="$(mktemp)"
           write_file="$(mktemp)"
           trap 'rm -f "$intake_file" "$write_file"' EXIT
 
           intake_status="$(curl --silent --show-error --output "$intake_file" --write-out '%{http_code}' \
-            --request POST "$service_url/intakes" \
+            --request POST "$SERVICE_URL/intakes" \
             --header "Authorization: Bearer $identity_token" \
             --header "X-API-Key: $api_token" \
             --header "X-Request-ID: $request_id" \
@@ -58,7 +59,7 @@ jobs:
           )"
 
           write_status="$(curl --silent --show-error --output "$write_file" --write-out '%{http_code}' \
-            --request POST "$service_url/sandbox/sheets/intakes/$intake_id" \
+            --request POST "$SERVICE_URL/sandbox/sheets/intakes/$intake_id" \
             --header "Authorization: Bearer $identity_token" \
             --header "X-API-Key: $api_token" \
             --header "X-Request-ID: $request_id")"
