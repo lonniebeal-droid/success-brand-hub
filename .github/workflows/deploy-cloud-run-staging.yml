@@ -1,0 +1,88 @@
+name: Deploy Jesse to Cloud Run staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Commit SHA from main that already passed tests
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: jesse-cloud-run-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      TARGET_SHA: ${{ inputs.commit_sha }}
+      SERVICE_NAME: success-brand-jesse-staging
+      REGION: us-central1
+    steps:
+      - name: Require a main-branch commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-remote --exit-code \
+            "https://github.com/${GITHUB_REPOSITORY}.git" \
+            "refs/heads/main" | awk '{print $1}' | grep -Fx "$TARGET_SHA"
+
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Deploy staging service
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud run deploy "$SERVICE_NAME" \
+            --source . \
+            --project "$GCP_PROJECT_ID" \
+            --region "$REGION" \
+            --platform managed \
+            --allow-unauthenticated \
+            --min-instances 0 \
+            --max-instances 1 \
+            --cpu 1 \
+            --memory 512Mi \
+            --timeout 60 \
+            --set-env-vars 'JESSE_ENVIRONMENT=staging,JESSE_INTEGRATION_MODE=mock,JESSE_DATA_PATH=/tmp/jesse/intakes.json,JESSE_TWILIO_ENABLED=false,JESSE_ELEVENLABS_ENABLED=false,JESSE_GOOGLE_CALENDAR_ENABLED=false,JESSE_GMAIL_ENABLED=false,JESSE_GOOGLE_SHEETS_ENABLED=false,JESSE_N8N_ENABLED=false' \
+            --quiet
+
+      - name: Verify health
+        shell: bash
+        run: |
+          set -euo pipefail
+          service_url="$(gcloud run services describe "$SERVICE_NAME" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$REGION" \
+            --format='value(status.url)')"
+          response="$(curl --fail --silent --show-error \
+            --retry 5 --retry-all-errors --retry-delay 2 \
+            "$service_url/health")"
+          python -c 'import json,sys; assert json.loads(sys.argv[1])["status"] == "ok"' "$response"
+          {
+            echo '## Jesse Cloud Run staging deployment'
+            echo "- Commit: \`$TARGET_SHA\`"
+            echo "- Service: \`$SERVICE_NAME\`"
+            echo "- Region: \`$REGION\`"
+            echo "- URL: $service_url"
+            echo '- Health: passing'
+            echo '- Integrations: disabled (mock mode)'
+            echo '- Scaling: 0 minimum / 1 maximum instance'
+          } >> "$GITHUB_STEP_SUMMARY"
