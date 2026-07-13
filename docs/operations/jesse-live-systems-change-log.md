@@ -170,3 +170,22 @@ Before any live change:
 ### Rollback and safety
 
 If any lookup returns zero or multiple intended matches, or any request affects more than one event, keep both scenarios inactive and route the request to office follow-up. Exact external scenario, run, webhook, and conversation identifiers remain only in the private canonical Google Doc.
+
+
+## July 13, 2026 — controlled phone verification completed
+
+### User-observed results
+
+- **Booking:** A fake-data appointment appeared on the support calendar at the requested time.
+- **Call ending:** Jesse ended the call after the caller's goodbye instruction without another confirmation loop.
+- **Cancellation:** The caller confirmed through direct calendar observation that the original fake appointment was removed.
+- **Rescheduling:** The caller confirmed through direct calendar observation that the old fake event disappeared and exactly one replacement event appeared at the requested time.
+- No real client information was used.
+
+### Verification level
+
+These results are user-verified from direct calendar observation during controlled phone calls. They establish the working caller experience. Exact platform logs and one-event mutation counts should remain available for later audit.
+
+### Monitoring requirement
+
+Continue monitoring live calls. If a duplicate event, missing event, wrong time, repeated confirmation, false success statement, or failure to invoke **End conversation** occurs, preserve the call time and private conversation identifier, disable the affected automation, and document the incident in the canonical support-owned Google Doc.
