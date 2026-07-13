@@ -12,7 +12,7 @@ This integration is disabled by default and creates **drafts only**. It never se
 
 ## Important authentication limitation
 
-Workload Identity Federation authenticates the staging service account, but it does not automatically give that identity access to a Gmail mailbox. A Google Workspace administrator must explicitly configure domain-wide delegation to a dedicated test mailbox, or a separate user-consent OAuth design must be reviewed. Do not grant delegation to a production mailbox.
+Workload Identity Federation authenticates the staging service account, but it does not automatically give that identity access to a Gmail mailbox. The preferred setup for a dedicated test mailbox is user-consent OAuth with the minimum `gmail.compose` scope. Workspace domain-wide delegation remains an optional administrator-controlled alternative and must never target a production mailbox.
 
 Until approved test-mailbox access exists, leave the integration disabled. The current implementation fails safely if ADC lacks mailbox permission.
 
@@ -23,6 +23,9 @@ GMAIL_SANDBOX_ENABLED=false
 GMAIL_MODE=mock
 GMAIL_SANDBOX_MAILBOX=
 GMAIL_SANDBOX_RECIPIENT=
+GMAIL_AUTH_MODE=oauth
 ```
+
+Store `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, and `GMAIL_OAUTH_REFRESH_TOKEN` as protected GitHub `staging` environment secrets. Never commit them or print them. OAuth consent must be completed manually while signed into the dedicated test mailbox.
 
 After security review, sandbox mode may be enabled only in the GitHub `staging` environment. The first controlled test must create one synthetic draft, confirm it remains unsent, and then delete it manually.

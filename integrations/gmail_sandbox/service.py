@@ -22,6 +22,7 @@ class GmailSandbox:
     def __init__(self, transport: Callable[..., dict] | None = None) -> None:
         self.enabled = os.getenv("GMAIL_SANDBOX_ENABLED", "false").casefold() == "true"
         self.mode = os.getenv("GMAIL_MODE", "mock").casefold()
+        self.auth_mode = os.getenv("GMAIL_AUTH_MODE", "oauth").casefold()
         self.mailbox = os.getenv("GMAIL_SANDBOX_MAILBOX", "")
         self.recipient = os.getenv("GMAIL_SANDBOX_RECIPIENT", "")
         self.project_id = os.getenv("GCP_PROJECT_ID", "")
@@ -31,7 +32,7 @@ class GmailSandbox:
         return {
             "enabled": self.enabled,
             "mode": self.mode if self.enabled else "disabled",
-            "auth_mode": "adc",
+            "auth_mode": self.auth_mode,
             "mailbox_configured": bool(self.mailbox),
             "recipient_configured": bool(self.recipient),
             "draft_only": True,
@@ -41,6 +42,8 @@ class GmailSandbox:
     def validate(self) -> None:
         if self.mode not in {"mock", "sandbox", "disabled"}:
             raise GmailSandboxError("invalid Gmail sandbox mode")
+        if self.auth_mode not in {"oauth", "adc"}:
+            raise GmailSandboxError("invalid Gmail authentication mode")
         if self.mode == "sandbox":
             if not self.enabled:
                 raise GmailSandboxError("Gmail sandbox is disabled")
@@ -69,11 +72,33 @@ class GmailSandbox:
         message["X-SuccessBrand-Sandbox-Request-ID"] = request_id
         message.set_content("Synthetic Success Brand staging draft. No client or production data.")
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode().rstrip("=")
-        result = self.transport(mailbox=self.mailbox, project_id=self.project_id, payload={"message": {"raw": raw}})
+        result = self.transport(
+            mailbox=self.mailbox,
+            project_id=self.project_id,
+            auth_mode=self.auth_mode,
+            payload={"message": {"raw": raw}},
+        )
         return {"status": "draft-created", "network_calls": 1, "draft_only": True, "draft_reference": result.get("id", "gmail-draft")}
 
     @staticmethod
-    def _google_transport(*, mailbox: str, project_id: str, payload: dict) -> dict:
+    def _google_transport(*, mailbox: str, project_id: str, auth_mode: str, payload: dict) -> dict:
+        if auth_mode == "oauth":
+            token = GmailSandbox._oauth_access_token()
+        else:
+            token = GmailSandbox._adc_access_token(project_id)
+        response = httpx.post(
+            "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
+            headers={"Authorization": f"Bearer {token}"},
+            json=payload,
+            timeout=5.0,
+        )
+        if response.status_code in {401, 403}:
+            raise GmailSandboxError("approved test mailbox access is unavailable")
+        response.raise_for_status()
+        return response.json()
+
+    @staticmethod
+    def _adc_access_token(project_id: str) -> str:
         import google.auth
         from google.auth.transport.requests import Request
 
@@ -81,13 +106,26 @@ class GmailSandbox:
         if detected_project and detected_project != project_id:
             raise GmailSandboxError("ADC project does not match staging")
         credentials.refresh(Request())
+        return credentials.token
+
+    @staticmethod
+    def _oauth_access_token() -> str:
+        values = {
+            "client_id": os.getenv("GMAIL_OAUTH_CLIENT_ID", ""),
+            "client_secret": os.getenv("GMAIL_OAUTH_CLIENT_SECRET", ""),
+            "refresh_token": os.getenv("GMAIL_OAUTH_REFRESH_TOKEN", ""),
+        }
+        if not all(values.values()):
+            raise GmailSandboxError("Gmail OAuth staging secrets are incomplete")
         response = httpx.post(
-            "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
-            headers={"Authorization": f"Bearer {credentials.token}"},
-            json=payload,
+            "https://oauth2.googleapis.com/token",
+            data={**values, "grant_type": "refresh_token"},
             timeout=5.0,
         )
-        if response.status_code in {401, 403}:
-            raise GmailSandboxError("ADC identity has no approved test mailbox access")
+        if response.status_code in {400, 401, 403}:
+            raise GmailSandboxError("Gmail OAuth authorization is unavailable")
         response.raise_for_status()
-        return response.json()
+        token = response.json().get("access_token")
+        if not token:
+            raise GmailSandboxError("Gmail OAuth response did not include an access token")
+        return token

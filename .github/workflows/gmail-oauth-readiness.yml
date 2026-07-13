@@ -1,0 +1,42 @@
+name: Gmail OAuth readiness test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-test-mailbox-authorization:
+    environment: staging
+    runs-on: ubuntu-latest
+    env:
+      CLIENT_ID: ${{ secrets.GMAIL_OAUTH_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.GMAIL_OAUTH_CLIENT_SECRET }}
+      REFRESH_TOKEN: ${{ secrets.GMAIL_OAUTH_REFRESH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Verify short-lived Gmail OAuth access only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLIENT_ID"
+          test -n "$CLIENT_SECRET"
+          test -n "$REFRESH_TOKEN"
+          response=$(curl --fail-with-body --silent --show-error \
+            -X POST https://oauth2.googleapis.com/token \
+            --data-urlencode "client_id=$CLIENT_ID" \
+            --data-urlencode "client_secret=$CLIENT_SECRET" \
+            --data-urlencode "refresh_token=$REFRESH_TOKEN" \
+            --data-urlencode 'grant_type=refresh_token')
+          token_available=$(python -c 'import json,sys; print(str(bool(json.load(sys.stdin).get("access_token"))).lower())' <<<"$response")
+          test "$token_available" = true
+          {
+            echo 'authentication_status: success'
+            echo 'short_lived_token_available: true'
+            echo 'gmail_api_called: false'
+            echo 'draft_created: false'
+            echo 'email_sent: false'
+            echo 'sandbox_feature_enabled: false'
+          } >> "$GITHUB_STEP_SUMMARY"

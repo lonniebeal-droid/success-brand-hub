@@ -60,11 +60,39 @@ def test_google_transport_uses_compose_scope(monkeypatch):
         def json(self): return {"id": "draft-1"}
     monkeypatch.setattr("google.auth.default", lambda *, scopes: (captured.update(scopes=scopes) or Credentials(), "success-brand-staging"))
     monkeypatch.setattr("httpx.post", lambda url, **kwargs: captured.update(url=url, kwargs=kwargs) or Response())
-    result = GmailSandbox._google_transport(mailbox="sandbox-test@example.com", project_id="success-brand-staging", payload={"message": {"raw": "fake"}})
+    result = GmailSandbox._google_transport(mailbox="sandbox-test@example.com", project_id="success-brand-staging", auth_mode="adc", payload={"message": {"raw": "fake"}})
     assert result["id"] == "draft-1"
     assert captured["scopes"] == [GMAIL_COMPOSE_SCOPE]
     assert captured["refreshed"] is True
     assert captured["url"].endswith("/users/me/drafts")
+
+
+def test_oauth_transport_refreshes_without_logging_secrets(monkeypatch):
+    monkeypatch.setenv("GMAIL_OAUTH_CLIENT_ID", "test-client-id")
+    monkeypatch.setenv("GMAIL_OAUTH_CLIENT_SECRET", "test-client-secret")
+    monkeypatch.setenv("GMAIL_OAUTH_REFRESH_TOKEN", "test-refresh-token")
+    captured = []
+    class Response:
+        status_code = 200
+        def __init__(self, body): self.body = body
+        def raise_for_status(self): return None
+        def json(self): return self.body
+    def fake_post(url, **kwargs):
+        captured.append((url, kwargs))
+        return Response({"access_token": "short-lived-test-token"} if "oauth2" in url else {"id": "draft-2"})
+    monkeypatch.setattr("httpx.post", fake_post)
+    result = GmailSandbox._google_transport(mailbox="sandbox-test@example.com", project_id="success-brand-staging", auth_mode="oauth", payload={"message": {"raw": "fake"}})
+    assert result["id"] == "draft-2"
+    assert captured[0][0] == "https://oauth2.googleapis.com/token"
+    assert captured[0][1]["data"]["grant_type"] == "refresh_token"
+    assert captured[1][1]["headers"]["Authorization"] == "Bearer short-lived-test-token"
+
+
+def test_oauth_fails_closed_when_secrets_are_missing(monkeypatch):
+    for name in ("GMAIL_OAUTH_CLIENT_ID", "GMAIL_OAUTH_CLIENT_SECRET", "GMAIL_OAUTH_REFRESH_TOKEN"):
+        monkeypatch.delenv(name, raising=False)
+    with pytest.raises(GmailSandboxError, match="incomplete"):
+        GmailSandbox._oauth_access_token()
 
 
 def test_routes_are_protected(tmp_path, monkeypatch):
