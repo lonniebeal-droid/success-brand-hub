@@ -1,0 +1,91 @@
+name: Gmail controlled unsent draft test
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type CREATE UNSENT DRAFT to authorize one synthetic draft
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  create-one-unsent-draft:
+    environment: staging
+    runs-on: ubuntu-latest
+    env:
+      CLIENT_ID: ${{ secrets.GMAIL_OAUTH_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.GMAIL_OAUTH_CLIENT_SECRET }}
+      REFRESH_TOKEN: ${{ secrets.GMAIL_OAUTH_REFRESH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Require explicit confirmation
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        shell: bash
+        run: test "$CONFIRMATION" = "CREATE UNSENT DRAFT"
+
+      - name: Create exactly one synthetic Gmail draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLIENT_ID"
+          test -n "$CLIENT_SECRET"
+          test -n "$REFRESH_TOKEN"
+
+          token_response=$(curl --fail-with-body --silent --show-error \
+            -X POST https://oauth2.googleapis.com/token \
+            --data-urlencode "client_id=$CLIENT_ID" \
+            --data-urlencode "client_secret=$CLIENT_SECRET" \
+            --data-urlencode "refresh_token=$REFRESH_TOKEN" \
+            --data-urlencode 'grant_type=refresh_token')
+          access_token=$(python -c 'import json,sys; print(json.load(sys.stdin).get("access_token", ""))' <<<"$token_response")
+          test -n "$access_token"
+          echo "::add-mask::$access_token"
+
+          payload=$(python - <<'PY'
+          import base64
+          import json
+          import os
+          from email.message import EmailMessage
+
+          message = EmailMessage()
+          message["Subject"] = f"SuccessBrand controlled Gmail sandbox draft - run {os.environ['GITHUB_RUN_ID']}"
+          message["X-SuccessBrand-Sandbox"] = "controlled-unsent-draft-v1"
+          message["X-GitHub-Run-ID"] = os.environ["GITHUB_RUN_ID"]
+          message.set_content(
+              "Synthetic SuccessBrand staging draft. No recipient, client data, or production data. "
+              "This message must remain unsent."
+          )
+          raw = base64.urlsafe_b64encode(message.as_bytes()).decode().rstrip("=")
+          print(json.dumps({"message": {"raw": raw}}))
+          PY
+          )
+
+          response_file=$(mktemp)
+          trap 'rm -f "$response_file"' EXIT
+          http_status=$(curl --silent --show-error \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            -X POST https://gmail.googleapis.com/gmail/v1/users/me/drafts \
+            -H "Authorization: Bearer $access_token" \
+            -H 'Content-Type: application/json' \
+            --data "$payload")
+          test "$http_status" = "200"
+          draft_created=$(python -c 'import json,sys; print(str(bool(json.load(sys.stdin).get("id"))).lower())' <"$response_file")
+          test "$draft_created" = true
+
+          {
+            echo 'authentication_status: success'
+            echo 'gmail_api_called: true'
+            echo 'draft_created: true'
+            echo 'recipient_present: false'
+            echo 'email_sent: false'
+            echo 'synthetic_data_only: true'
+            echo 'sandbox_feature_enabled: false'
+            echo "workflow_run_id: $GITHUB_RUN_ID"
+            echo "commit_sha: $GITHUB_SHA"
+          } >> "$GITHUB_STEP_SUMMARY"
