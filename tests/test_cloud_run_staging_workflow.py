@@ -18,6 +18,10 @@ def test_cloud_run_staging_is_private_and_tightly_scaled() -> None:
     assert '--memory 512Mi' in workflow
     assert "--allow-unauthenticated" not in workflow
     assert "--gpu" not in workflow
+    assert "remove-iam-policy-binding" in workflow
+    assert "--member allUsers" in workflow
+    assert 'public_status' in workflow
+    assert '"401"' in workflow and '"403"' in workflow
 
 
 def test_cloud_run_staging_keeps_integrations_disabled() -> None:
@@ -32,4 +36,3 @@ def test_cloud_run_staging_keeps_integrations_disabled() -> None:
         "JESSE_N8N_ENABLED=false",
     ):
         assert setting in workflow
-
