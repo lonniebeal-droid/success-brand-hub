@@ -79,6 +79,67 @@ jobs:
           print(f"Vertex draft archived privately: {archive['uri']}")
           PY
 
+      - name: Build human review package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p review-package
+          cp pilot-result.json review-package/draft.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(Path("pilot-result.json").read_text())
+          batch = result["batch"]
+          draft = batch["drafts"][0]
+          archive = result["archive"]
+          hashtags = " ".join(draft["hashtags"])
+          report = f"""# SuccessBrand Content Review
+
+          Status: DRAFT - HUMAN APPROVAL REQUIRED
+
+          ## Draft
+
+          **Title:** {draft["title"]}
+
+          **Hook:** {draft["hook"]}
+
+          **Script:**
+
+          {draft["script"]}
+
+          **Caption:** {draft["caption"]}
+
+          **Hashtags:** {hashtags}
+
+          ## Review checklist
+
+          - [ ] Brand voice is warm, direct, practical, and inclusive
+          - [ ] Claims are supported and not medical advice
+          - [ ] No diagnosis, treatment, or guaranteed-result language
+          - [ ] Image and video prompts contain no named real people
+          - [ ] Final wording is approved by a human reviewer
+
+          ## Controls
+
+          - Publishing enabled: NO
+          - Public access: NO
+          - Model: {batch["model"]}
+          - Private archive: {archive["uri"]}
+
+          Approval must be recorded outside this package. This artifact cannot publish content.
+          """
+          Path("review-package/REVIEW.md").write_text(report)
+          PY
+
+      - name: Upload seven-day review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: successbrand-content-review-${{ github.run_id }}
+          path: review-package/
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Record pilot result
         if: success()
         shell: bash
@@ -91,6 +152,7 @@ jobs:
             echo '- Model: `gemini-2.5-flash`'
             echo '- Drafts generated: 1'
             echo '- Human approval: required'
+            echo '- Review package: attached to this run for 7 days'
             echo '- Public access: false'
             echo '- Publishing: disabled'
           } >> "$GITHUB_STEP_SUMMARY"
