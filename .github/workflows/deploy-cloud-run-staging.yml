@@ -70,10 +70,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          gcloud beta run services remove-iam-policy-binding "$SERVICE_NAME" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$REGION" \
+            --member allUsers \
+            --role roles/run.invoker \
+            --quiet
           service_url="$(gcloud run services describe "$SERVICE_NAME" \
             --project "$GCP_PROJECT_ID" \
             --region "$REGION" \
             --format='value(status.url)')"
+          public_status="$(curl --silent --output /dev/null --write-out '%{http_code}' "$service_url/health")"
+          if [[ "$public_status" != "401" && "$public_status" != "403" ]]; then
+            echo "Expected private service, received unauthenticated HTTP $public_status" >&2
+            exit 1
+          fi
           response="$(curl --fail --silent --show-error \
             --retry 5 --retry-all-errors --retry-delay 2 \
             --header "Authorization: Bearer $(gcloud auth print-identity-token --audiences="$service_url")" \
