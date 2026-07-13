@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import re
+import uuid
 from datetime import datetime
 from typing import Any
 
@@ -28,6 +30,7 @@ from core.runtime.worker import BackgroundWorker
 from core.scheduling import SchedulingService
 from crm.router import create_crm_router
 from callcenter.router import create_callcenter_router
+from integrations.google_sheets_sandbox.router import create_google_sheets_router
 
 
 class LoginRequest(BaseModel):
@@ -86,6 +89,16 @@ def create_app(database: Database | None = None) -> FastAPI:
     app = FastAPI(title="Success Brand Platform v2", version="2.0.0")
     app.include_router(create_crm_router(db))
     app.include_router(create_callcenter_router(db))
+    app.include_router(create_google_sheets_router(db))
+
+    @app.middleware("http")
+    async def integration_request_id(request, call_next):
+        request_id = request.headers.get("X-Request-ID")
+        if not request_id or not re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", request_id):
+            request_id = str(uuid.uuid4())
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
     @app.get("/health")
     def health():
