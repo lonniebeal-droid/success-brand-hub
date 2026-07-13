@@ -67,7 +67,8 @@ jobs:
           python - "$write_file" <<'PY'
           import json, sys
           payload = json.load(open(sys.argv[1], encoding="utf-8"))
-          assert payload.get("integration") == "google_sheets"
-          assert payload.get("result", {}).get("status") == "written"
+          assert payload.get("service") == "google_sheets"
+          assert payload.get("status") == "written"
+          assert payload.get("sandbox") is True
           PY
           echo "Application write succeeded with synthetic data; sensitive values were not logged."
