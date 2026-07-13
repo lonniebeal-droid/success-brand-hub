@@ -27,7 +27,7 @@ Do not create a competing master document.
 
 ### Evidence
 
-Live ElevenLabs conversation `conv_2801kxej5kg4ec5rjz1bjj5sj3ff` lasted 2 minutes 59 seconds. Jesse repeated the caller's contact and appointment details, continued after the caller said goodbye, and required the caller to end the call remotely.
+The reviewed live ElevenLabs conversation lasted 2 minutes 59 seconds. The exact conversation identifier is retained only in the private canonical Google Doc. Jesse repeated the caller's contact and appointment details, continued after the caller said goodbye, and required the caller to end the call remotely.
 
 ### Root cause
 
@@ -81,18 +81,15 @@ The `cancel_appointment` and `reschedule_appointment` tools are Make webhooks. H
 ### Evidence
 
 - **Jesse Cancellation Handler**
-  - Make scenario: `5546279`
-  - run: `41c733381d7149c2935e01f90aa595a0`
+  - exact Make scenario and run identifiers are retained only in the private canonical Google Doc
   - executed nine Google Calendar **Delete an Event** operations
   - run showed both **No matching event** and **Event found** paths
 - **Jesse Reschedule Handler**
-  - Make scenario: `5572627`
-  - run: `661e4c0317e4488ca138f54d6d6fa409`
+  - exact Make scenario and run identifiers are retained only in the private canonical Google Doc
   - executed four Google Calendar **Update an Event** operations
   - showed the same unsafe multi-bundle routing pattern
 - Historical failures referenced the invalid calendar endpoint:
-  `/calendar/v3/calendars/support%40successbrand.org/events/`
-  and returned Google 404 responses.
+  a malformed calendar endpoint and returned Google 404 responses. The exact endpoint is retained only in the private canonical Google Doc.
 
 ### Safety action
 
