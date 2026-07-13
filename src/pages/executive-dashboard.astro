@@ -9,6 +9,11 @@ const agents = [
   ['Finance','Planned','Financial operations'],
   ['Workspace','Planned','Google Workspace operations'],
 ];
+const operations = [
+  ['Agent health','3 runtimes ready'],['Running tasks','0 active'],['Queue','Persistent SQLite queue'],
+  ['Completed work','Tracked with duration'],['Reports','Operational summaries'],['Appointments','Conflict-safe local calendar'],
+  ['Messages','Internal priority messaging'],['Memory','Long and short term'],['Notifications','Dashboard and placeholders']
+];
 ---
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width"/><meta name="robots" content="noindex,nofollow"/><title>Success Brand Executive Dashboard</title>
 <style>
@@ -16,4 +21,5 @@ const agents = [
 <body><main><span class="eyebrow">Success Brand Hub · Development</span><h1>Executive command center</h1><p class="lede">A read-only operational view of agent readiness, runtime health, and work queues. No credentials, caller data, or production controls are exposed.</p>
 <section class="summary"><article class="card"><span>Registered agents</span><strong class="metric">{agents.length}</strong></article><article class="card"><span>Active runtimes</span><strong class="metric">3</strong></article><article class="card"><span>Open tasks</span><strong class="metric">0</strong></article><article class="card"><span>Platform health</span><strong class="metric">Ready</strong></article></section>
 <section class="grid">{agents.map(([name,status,description])=><article class="card agent"><div><h2>{name}</h2><p>{description}</p></div><span class:list={['pill',status.toLowerCase()]}>{status}</span></article>)}</section>
+<h2 style="margin-top:36px">Staging operations</h2><section class="grid">{operations.map(([name,description])=><article class="card"><h2>{name}</h2><p class="lede">{description}</p></article>)}</section><p><a href="/admin" style="color:#79b8ff">Open administration dashboard</a></p>
 </main></body></html>
