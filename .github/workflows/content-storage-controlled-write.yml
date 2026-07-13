@@ -1,0 +1,77 @@
+name: Content Storage Controlled Write
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: content-storage-controlled-write
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      CONTENT_ASSET_BUCKET: ${{ vars.CONTENT_ASSET_BUCKET }}
+      CONTENT_GENERATION_MODE: mock
+      CONTENT_STORAGE_MODE: gcs
+      GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install content storage dependencies
+        run: python -m pip install --requirement requirements.txt
+
+      - name: Upload one private draft archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CONTENT_ASSET_BUCKET"
+          python -m agents.content.cli \
+            "storage connection verification" \
+            --archive \
+            --campaign "staging controlled test" \
+            --quantity 1 > archive-result.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(Path("archive-result.json").read_text())
+          archive = result["archive"]
+          assert archive["mode"] == "gcs"
+          assert archive["public"] is False
+          assert archive["uri"].startswith("gs://")
+          assert result["batch"]["mode"] == "mock"
+          print(f"Created private staging draft: {archive['uri']}")
+          PY
+
+      - name: Record safe result
+        if: success()
+        shell: bash
+        run: |
+          uri="$(python -c 'import json; print(json.load(open("archive-result.json"))["archive"]["uri"])')"
+          {
+            echo '## Content Storage controlled write'
+            echo "- Object: \`$uri\`"
+            echo '- Environment: staging'
+            echo '- Generator: mock (no model credits used)'
+            echo '- Public access: false'
+            echo '- Publishing: disabled'
+          } >> "$GITHUB_STEP_SUMMARY"
