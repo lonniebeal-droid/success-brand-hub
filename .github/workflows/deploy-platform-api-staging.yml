@@ -34,7 +34,7 @@ jobs:
             "https://github.com/${GITHUB_REPOSITORY}.git" \
             "refs/heads/main" | awk '{print $1}' | grep -Fx "$TARGET_SHA"
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.TARGET_SHA }}
 

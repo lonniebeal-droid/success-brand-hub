@@ -19,7 +19,7 @@ jobs:
       SIGNING_SECRET: ${{ secrets.N8N_SANDBOX_SIGNING_SECRET }}
       CONFIRMATION: ${{ inputs.confirmation }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Trigger one signed synthetic event
         shell: bash
         run: |

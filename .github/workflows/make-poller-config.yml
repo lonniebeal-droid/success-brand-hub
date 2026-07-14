@@ -31,7 +31,7 @@ jobs:
       MAKE_APPOINTMENT_SCENARIO_ID: ${{ vars.MAKE_POLLER_SCENARIO_ID }}
       EXTERNAL_CONFIG_DEPLOY_ENABLED: ${{ inputs.operation == 'apply' && 'true' || 'false' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
