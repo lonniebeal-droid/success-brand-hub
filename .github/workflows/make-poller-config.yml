@@ -1,0 +1,96 @@
+name: Jesse Make poller config
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Export current blueprint, dry-run a manifest, or apply a reviewed manifest
+        required: true
+        type: choice
+        options: [export, dry-run, apply]
+      manifest:
+        description: Reviewed manifest path
+        required: false
+        default: config/external/make/jesse-intake-poller.staging.json
+      confirmation:
+        description: Type APPLY only for a provider write
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  poller-config:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+      MAKE_API_BASE_URL: ${{ vars.MAKE_API_BASE_URL }}
+      # The sync utility currently recognizes this approved alias. In this
+      # dedicated workflow it is populated only from the poller scenario ID.
+      MAKE_APPOINTMENT_SCENARIO_ID: ${{ vars.MAKE_POLLER_SCENARIO_ID }}
+      EXTERNAL_CONFIG_DEPLOY_ENABLED: ${{ inputs.operation == 'apply' && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Validate operation
+        shell: bash
+        env:
+          OPERATION: ${{ inputs.operation }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          if [[ "$OPERATION" == "apply" && "$CONFIRMATION" != "APPLY" ]]; then
+            echo 'Apply requires confirmation APPLY.' >&2
+            exit 2
+          fi
+      - name: Export current redacted poller config
+        if: inputs.operation == 'export'
+        run: |
+          python scripts/external_config_sync.py export \
+            --provider make \
+            --target staging \
+            --resource-id-env MAKE_APPOINTMENT_SCENARIO_ID \
+            --output exported/jesse-intake-poller.staging.json
+      - uses: actions/upload-artifact@v4
+        if: inputs.operation == 'export'
+        with:
+          name: redacted-jesse-intake-poller-${{ github.run_id }}
+          path: exported/*.json
+          retention-days: 7
+          if-no-files-found: error
+      - name: Validate reviewed manifest
+        if: inputs.operation != 'export'
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -euo pipefail
+          case "$MANIFEST" in
+            config/external/make/jesse-intake-poller.staging.json) ;;
+            *) echo 'Only the reviewed Jesse intake poller staging manifest is allowed.' >&2; exit 2 ;;
+          esac
+          python scripts/external_config_sync.py validate "$MANIFEST"
+      - name: Dry-run reviewed manifest
+        if: inputs.operation == 'dry-run'
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: python scripts/external_config_sync.py deploy "$MANIFEST"
+      - name: Apply reviewed manifest
+        if: inputs.operation == 'apply'
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: python scripts/external_config_sync.py deploy "$MANIFEST" --apply
+      - name: Safe summary
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          {
+            echo '## Jesse Make poller configuration'
+            echo "Operation: $OPERATION"
+            echo 'Scenario activation changed: false'
+            echo 'Credentials printed: false'
+            echo 'Production scenarios touched: false'
+            echo 'Manual Make execution tests are still required after any apply.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "provider": "make",
+  "target": "staging",
+  "resource_id_env": "MAKE_APPOINTMENT_SCENARIO_ID",
+  "payload": {}
+}
