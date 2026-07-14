@@ -37,9 +37,12 @@ jobs:
           python-version: "3.12"
       - name: Validate operation
         shell: bash
+        env:
+          OPERATION: ${{ inputs.operation }}
+          CONFIRMATION: ${{ inputs.confirmation }}
         run: |
           set -euo pipefail
-          if [[ "${{ inputs.operation }}" == "apply" && "${{ inputs.confirmation }}" != "APPLY" ]]; then
+          if [[ "$OPERATION" == "apply" && "$CONFIRMATION" != "APPLY" ]]; then
             echo 'Apply requires confirmation APPLY.' >&2
             exit 2
           fi
@@ -71,15 +74,21 @@ jobs:
           python scripts/external_config_sync.py validate "$MANIFEST"
       - name: Dry-run reviewed manifest
         if: inputs.operation == 'dry-run'
-        run: python scripts/external_config_sync.py deploy "${{ inputs.manifest }}"
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: python scripts/external_config_sync.py deploy "$MANIFEST"
       - name: Apply reviewed manifest
         if: inputs.operation == 'apply'
-        run: python scripts/external_config_sync.py deploy "${{ inputs.manifest }}" --apply
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: python scripts/external_config_sync.py deploy "$MANIFEST" --apply
       - name: Safe summary
+        env:
+          OPERATION: ${{ inputs.operation }}
         run: |
           {
             echo '## Jesse Make poller configuration'
-            echo "Operation: ${{ inputs.operation }}"
+            echo "Operation: $OPERATION"
             echo 'Scenario activation changed: false'
             echo 'Credentials printed: false'
             echo 'Production scenarios touched: false'
