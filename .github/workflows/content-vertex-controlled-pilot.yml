@@ -133,7 +133,7 @@ jobs:
           PY
 
       - name: Upload seven-day review artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: successbrand-content-review-${{ github.run_id }}
           path: review-package/
