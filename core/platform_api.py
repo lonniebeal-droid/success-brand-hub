@@ -39,20 +39,18 @@ from integrations.gmail_sandbox import create_gmail_sandbox_router
 from integrations.n8n_sandbox import create_n8n_sandbox_router
 from integrations.twilio_sandbox import create_twilio_sandbox_router
 from integrations.elevenlabs_sandbox import create_elevenlabs_sandbox_router
-
+from integrations.jesse_status_adapter import get_jesse_status
+from integrations.make_adapter import get_make_status
 
 class LoginRequest(BaseModel):
     username: str
     password: str
 
-
 class RefreshRequest(BaseModel):
     refresh_token: str
 
-
 class UserRequest(LoginRequest):
     role: str = "viewer"
-
 
 class TaskRequest(BaseModel):
     title: str = Field(min_length=1, max_length=300)
@@ -61,19 +59,16 @@ class TaskRequest(BaseModel):
     priority: int = Field(default=5, ge=1, le=10)
     scheduled_for: datetime | None = None
 
-
 class MemoryRequest(BaseModel):
     namespace: str
     content: str
     kind: str = "long_term"
     conversation_id: str | None = None
 
-
 class NotificationRequest(BaseModel):
     recipient: str
     message: str
     channel: str = "internal"
-
 
 class AppointmentRequest(BaseModel):
     title: str
@@ -81,21 +76,17 @@ class AppointmentRequest(BaseModel):
     end_at: datetime
     attendee: str | None = None
 
-
 class DelegationRequest(BaseModel):
     objective: str = Field(min_length=1, max_length=300)
     payload: dict[str, Any] = Field(default_factory=dict)
     priority: int = Field(default=5, ge=1, le=10)
 
-
 class ContentPackRequest(BaseModel):
     topic: str = Field(min_length=1, max_length=120)
     audience: str = Field(default="adults", min_length=1, max_length=80)
 
-
 def _public(model: Any) -> dict[str, Any]:
     return {column.name: getattr(model, column.name) for column in model.__table__.columns}
-
 
 def create_app(database: Database | None = None) -> FastAPI:
     db = database or get_database()
@@ -149,7 +140,7 @@ def create_app(database: Database | None = None) -> FastAPI:
     def logout(payload: RefreshRequest, _: dict = Depends(require_user)):
         with db.session() as session:
             revoke_refresh_token(session, payload.refresh_token)
-        return {"logged_out": True}
+            return {"logged_out": True}
 
     @app.get("/me")
     def me(user: dict = Depends(require_user)):
@@ -218,6 +209,21 @@ def create_app(database: Database | None = None) -> FastAPI:
     def conversation_summary(conversation_id: str, _: dict = Depends(require_role("viewer"))):
         return memory.summarize(conversation_id)
 
+    @app.get("/ops/conversations/latest")
+    def latest_conversation(_: dict = Depends(require_role("viewer"))):
+        result = memory.latest_conversation()
+        if not result:
+            return {"status": "empty", "conversation": None}
+        return {"status": "ok", "conversation": result}
+
+    @app.get("/ops/jesse-status")
+    def jesse_status(_: dict = Depends(require_role("viewer"))):
+        return get_jesse_status()
+
+    @app.get("/ops/make-status")
+    def make_status(_: dict = Depends(require_role("viewer"))):
+        return get_make_status()
+
     @app.post("/notifications", status_code=201)
     def notify(payload: NotificationRequest, _: dict = Depends(require_role("manager"))):
         return _public(notifications.send(**payload.model_dump()))
@@ -270,6 +276,5 @@ def create_app(database: Database | None = None) -> FastAPI:
             }
 
     return app
-
 
 app = create_app()
