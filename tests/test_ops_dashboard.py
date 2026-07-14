@@ -95,6 +95,18 @@ def test_jesse_status_not_configured(monkeypatch):
     assert result["status"] == "not_configured"
 
 
+def test_jesse_status_not_configured_without_token_makes_no_network_calls(monkeypatch):
+    monkeypatch.setenv("JESSE_API_URL", "http://127.0.0.1:8000")
+    monkeypatch.delenv("JESSE_DASHBOARD_TOKEN", raising=False)
+
+    def _fail(*args, **kwargs):
+        raise AssertionError("no network calls expected when the dashboard token is missing")
+
+    result = get_jesse_status(transport=_fail)
+    assert result["status"] == "not_configured"
+    assert result["reachable"] is False
+
+
 def test_jesse_status_unreachable(monkeypatch):
     monkeypatch.setenv("JESSE_API_URL", "http://127.0.0.1:8000")
     monkeypatch.setenv("JESSE_DASHBOARD_TOKEN", "token")
