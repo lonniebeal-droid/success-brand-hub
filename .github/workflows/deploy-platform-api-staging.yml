@@ -1,0 +1,134 @@
+name: Deploy Platform API to Cloud Run staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Commit SHA from main that already passed CI
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: platform-api-cloud-run-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      TARGET_SHA: ${{ inputs.commit_sha }}
+      SERVICE_NAME: success-brand-platform-api-staging
+      REGION: us-central1
+    steps:
+      - name: Require a main-branch commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-remote --exit-code \
+            "https://github.com/${GITHUB_REPOSITORY}.git" \
+            "refs/heads/main" | awk '{print $1}' | grep -Fx "$TARGET_SHA"
+
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Ensure required secrets are present
+        shell: bash
+        env:
+          JESSE_DASHBOARD_TOKEN: ${{ secrets.JESSE_DASHBOARD_TOKEN }}
+          MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -z "${JESSE_DASHBOARD_TOKEN:-}" ]] && missing+=("JESSE_DASHBOARD_TOKEN")
+          [[ -z "${MAKE_API_TOKEN:-}" ]] && missing+=("MAKE_API_TOKEN")
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "Missing required GitHub Actions secrets in the 'staging' environment: ${missing[*]}" >&2
+            echo "Add them under Settings > Environments > staging > Secrets before running this workflow." >&2
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Build Platform API image
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="us-central1-docker.pkg.dev/${GCP_PROJECT_ID}/cloud-run-source-deploy/${SERVICE_NAME}:${TARGET_SHA}"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          gcloud builds submit . \
+            --project "$GCP_PROJECT_ID" \
+            --config cloudbuild.platform-api.yaml \
+            --substitutions "_IMAGE=$IMAGE"
+
+      - name: Deploy Platform API service
+        shell: bash
+        env:
+          JESSE_DASHBOARD_TOKEN: ${{ secrets.JESSE_DASHBOARD_TOKEN }}
+          MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/platform-api-env.yaml <<EOF
+          PLATFORM_ENVIRONMENT: "staging"
+          PLATFORM_DATABASE_URL: "sqlite:////tmp/platform/platform.db"
+          PLATFORM_ALLOWED_ORIGINS: "https://successbrandorg.netlify.app"
+          JESSE_API_URL: "https://success-brand-jesse-staging-3sqar3u4sq-uc.a.run.app"
+          JESSE_DASHBOARD_TOKEN: "${JESSE_DASHBOARD_TOKEN}"
+          MAKE_API_BASE_URL: "https://us2.make.com/api/v2"
+          MAKE_API_TOKEN: "${MAKE_API_TOKEN}"
+          MAKE_STATUS_SCENARIO_ID: "5654355"
+          MAKE_DATA_STORE_ID: "118014"
+          MAKE_DATA_STORE_CURSOR_KEY: "1"
+          EOF
+          gcloud run deploy "$SERVICE_NAME" \
+            --image "$IMAGE" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$REGION" \
+            --platform managed \
+            --allow-unauthenticated \
+            --service-account "$GCP_SERVICE_ACCOUNT" \
+            --min-instances 0 \
+            --max-instances 1 \
+            --cpu 1 \
+            --memory 512Mi \
+            --timeout 60 \
+            --env-vars-file /tmp/platform-api-env.yaml \
+            --quiet
+          rm -f /tmp/platform-api-env.yaml
+
+      - name: Verify health and report
+        shell: bash
+        run: |
+          set -euo pipefail
+          service_url="$(gcloud run services describe "$SERVICE_NAME" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$REGION" \
+            --format='value(status.url)')"
+          public_status="$(curl --silent --output /dev/null --write-out '%{http_code}' "$service_url/health")"
+          if [[ "$public_status" != "200" ]]; then
+            echo "Expected a public health check, received HTTP $public_status" >&2
+            exit 1
+          fi
+          {
+            echo '## Platform API staging deployment'
+            echo "- Commit: \`$TARGET_SHA\`"
+            echo "- Service: \`$SERVICE_NAME\`"
+            echo "- Region: \`$REGION\`"
+            echo "- URL: $service_url"
+            echo '- Access: public endpoint; application-level JWT auth enforced by the API itself'
+            echo '- CORS: restricted to https://successbrandorg.netlify.app'
+            echo '- Existing success-brand-jesse-staging service: not modified'
+          } >> "$GITHUB_STEP_SUMMARY"
