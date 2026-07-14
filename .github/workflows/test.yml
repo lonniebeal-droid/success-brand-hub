@@ -31,6 +31,20 @@ jobs:
         run: python -m pytest agents/content/tests -q
       - name: Test ops dashboard
         run: python -m pytest tests/test_business_operations.py tests/test_ops_dashboard.py -q
+      - name: Platform API import and startup test
+        shell: bash
+        env:
+          PLATFORM_DATABASE_URL: sqlite:////tmp/platform-ci/platform.db
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from core.platform_api import create_app
+          app = create_app()
+          assert app.title == 'Success Brand Platform v2'
+          print('core.platform_api imports and creates an app successfully')
+          PY
+      - name: Build Platform API Docker image
+        run: docker build -f Dockerfile.platform-api -t platform-api-ci .
       - name: Build Astro
         env:
           ASTRO_TELEMETRY_DISABLED: "1"
