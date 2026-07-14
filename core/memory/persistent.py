@@ -10,7 +10,6 @@ from sqlalchemy import select
 from core.database.database import Database
 from core.database.models import Memory
 
-
 class PersistentMemoryEngine:
     def __init__(self, database: Database) -> None:
         self.database = database
@@ -36,6 +35,34 @@ class PersistentMemoryEngine:
     def summarize(self, conversation_id: str, max_characters: int = 500) -> str:
         combined = " ".join(item.content for item in self.conversation(conversation_id))
         return combined[:max_characters]
+
+    @staticmethod
+    def _redact_conversation_id(conversation_id: str | None) -> str:
+        if not conversation_id:
+            return "[redacted]"
+        tail = conversation_id[-4:]
+        return f"***{tail}" if len(conversation_id) > 4 else "***"
+
+    def latest_conversation(self) -> dict | None:
+        """Return a privacy-redacted summary of the most recently touched conversation.
+
+        Only a short excerpt, a redacted conversation id, a namespace, and a
+        timestamp are returned. Full conversation ids and full content require
+        an explicit, authorized lookup via conversation()/summarize().
+        """
+        with self.database.session() as session:
+            record = session.scalar(
+                select(Memory).where(Memory.conversation_id.is_not(None)).order_by(Memory.created_at.desc()).limit(1)
+            )
+        if not record:
+            return None
+        excerpt_source = record.summary or record.content or ""
+        return {
+            "conversation_id_redacted": self._redact_conversation_id(record.conversation_id),
+            "namespace": record.namespace,
+            "created_at": record.created_at,
+            "excerpt": excerpt_source[:160],
+        }
 
     def semantic_search(self, query: str, limit: int = 10) -> dict:
         tokens = self._tokens(query)
