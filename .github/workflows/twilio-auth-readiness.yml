@@ -14,7 +14,7 @@ jobs:
       ACCOUNT_SID: ${{ secrets.TWILIO_SANDBOX_ACCOUNT_SID }}
       AUTH_TOKEN: ${{ secrets.TWILIO_SANDBOX_AUTH_TOKEN }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Verify Twilio account access without calling or messaging
         shell: bash
         run: |
