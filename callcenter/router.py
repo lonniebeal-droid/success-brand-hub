@@ -5,25 +5,20 @@ from core.auth import require_role
 from core.database.database import Database
 from .service import CallCenterService
 
-
 class IncomingCall(BaseModel):
     caller: str | None = None
     agent: str | None = "jessie"
     metadata: dict = Field(default_factory=dict)
-
 
 class CallUpdate(BaseModel):
     state: str
     outcome: str | None = None
     duration_seconds: float | None = None
 
-
 class AvailabilityUpdate(BaseModel):
     status: str
 
-
 def public(item): return {column.name: getattr(item, column.name) for column in item.__table__.columns}
-
 
 def create_callcenter_router(database: Database) -> APIRouter:
     router = APIRouter(prefix="/callcenter", tags=["callcenter"])
@@ -33,7 +28,7 @@ def create_callcenter_router(database: Database) -> APIRouter:
     def incoming(payload: IncomingCall, _: dict = Depends(require_role("agent"))): return public(service.receive_mock_call(**payload.model_dump()))
 
     @router.get("/calls")
-    def calls(state: str | None = None, _: dict = Depends(require_role("viewer"))): return [public(item) for item in service.list_calls(state)]
+    def calls(state: str | None = None, outcome: str | None = None, _: dict = Depends(require_role("viewer"))): return [public(item) for item in service.list_calls(state, outcome)]
 
     @router.patch("/calls/{call_id}")
     def update(call_id: str, payload: CallUpdate, _: dict = Depends(require_role("agent"))):
