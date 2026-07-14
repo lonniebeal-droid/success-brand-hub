@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -42,15 +43,19 @@ from integrations.elevenlabs_sandbox import create_elevenlabs_sandbox_router
 from integrations.jesse_status_adapter import get_jesse_status
 from integrations.make_adapter import get_make_status
 
+
 class LoginRequest(BaseModel):
     username: str
     password: str
 
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 
+
 class UserRequest(LoginRequest):
     role: str = "viewer"
+
 
 class TaskRequest(BaseModel):
     title: str = Field(min_length=1, max_length=300)
@@ -59,16 +64,19 @@ class TaskRequest(BaseModel):
     priority: int = Field(default=5, ge=1, le=10)
     scheduled_for: datetime | None = None
 
+
 class MemoryRequest(BaseModel):
     namespace: str
     content: str
     kind: str = "long_term"
     conversation_id: str | None = None
 
+
 class NotificationRequest(BaseModel):
     recipient: str
     message: str
     channel: str = "internal"
+
 
 class AppointmentRequest(BaseModel):
     title: str
@@ -76,17 +84,21 @@ class AppointmentRequest(BaseModel):
     end_at: datetime
     attendee: str | None = None
 
+
 class DelegationRequest(BaseModel):
     objective: str = Field(min_length=1, max_length=300)
     payload: dict[str, Any] = Field(default_factory=dict)
     priority: int = Field(default=5, ge=1, le=10)
 
+
 class ContentPackRequest(BaseModel):
     topic: str = Field(min_length=1, max_length=120)
     audience: str = Field(default="adults", min_length=1, max_length=80)
 
+
 def _public(model: Any) -> dict[str, Any]:
     return {column.name: getattr(model, column.name) for column in model.__table__.columns}
+
 
 def create_app(database: Database | None = None) -> FastAPI:
     db = database or get_database()
@@ -99,6 +111,14 @@ def create_app(database: Database | None = None) -> FastAPI:
     orchestrator = AgentOrchestrator(queue)
     content_system = SuccessBrandContentSystem()
     app = FastAPI(title="Success Brand Platform v2", version="2.0.0")
+    allowed_origins = [origin.strip() for origin in os.getenv("PLATFORM_ALLOWED_ORIGINS", "*").split(",") if origin.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins or ["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.include_router(create_crm_router(db))
     app.include_router(create_callcenter_router(db))
     app.include_router(create_google_sheets_router(db))
@@ -140,7 +160,7 @@ def create_app(database: Database | None = None) -> FastAPI:
     def logout(payload: RefreshRequest, _: dict = Depends(require_user)):
         with db.session() as session:
             revoke_refresh_token(session, payload.refresh_token)
-            return {"logged_out": True}
+        return {"logged_out": True}
 
     @app.get("/me")
     def me(user: dict = Depends(require_user)):
@@ -276,5 +296,6 @@ def create_app(database: Database | None = None) -> FastAPI:
             }
 
     return app
+
 
 app = create_app()
