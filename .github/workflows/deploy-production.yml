@@ -43,6 +43,6 @@ jobs:
         run: |
           echo '## Jesse production deployment approval' >> "$GITHUB_STEP_SUMMARY"
           echo 'Protected environment approval completed.' >> "$GITHUB_STEP_SUMMARY"
-          echo "Selected commit: \`${{ inputs.commit_sha }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "Rollback target: \`${{ inputs.rollback_sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Selected commit: \\`${{ inputs.commit_sha }}\\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Rollback target: \\`${{ inputs.rollback_sha }}\\`" >> "$GITHUB_STEP_SUMMARY"
           echo 'External actions remain disabled until reviewed live adapters are implemented.' >> "$GITHUB_STEP_SUMMARY"
