@@ -29,6 +29,8 @@ jobs:
         run: python -m pytest agents/jessie/tests -q
       - name: Test Content pipeline
         run: python -m pytest agents/content/tests -q
+      - name: Test ops dashboard
+        run: python -m pytest tests/test_business_operations.py tests/test_ops_dashboard.py -q
       - name: Build Astro
         env:
           ASTRO_TELEMETRY_DISABLED: "1"

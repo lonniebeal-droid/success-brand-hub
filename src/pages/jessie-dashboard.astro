@@ -1,78 +1,326 @@
 ---
-const apiUrl = import.meta.env.JESSE_API_URL || 'http://127.0.0.1:8000';
-const cards = [
-  ['API health', 'Not connected', 'Start the local FastAPI service to populate live development metrics.'],
-  ['Total intakes', '—', 'No caller data is embedded in this page or its build output.'],
-  ['Pending callbacks', '—', 'Read-only dashboard access is planned through a server-side proxy.'],
-  ['Integration mode', 'Mock', 'Every external adapter defaults to disabled with zero network activity.'],
-];
-const deployment = {
-  version: '1.0.0-sandbox',
-  commit: 'UNDEPLOYED',
-  staging: 'Not deployed',
-  production: 'Not deployed',
-  lastTest: 'Not recorded',
-  previous: 'None',
-  rollback: 'Unavailable',
-};
+const apiBase = (import.meta.env.PUBLIC_PLATFORM_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 ---
-
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <meta name="robots" content="noindex,nofollow" />
-    <title>Jesse Development Dashboard</title>
-    <style>
-      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background:#07111f; color:#eef6ff; }
-      body { margin:0; min-height:100vh; background:radial-gradient(circle at top right,#15345d 0,transparent 35%),#07111f; }
-      main { width:min(1100px,calc(100% - 32px)); margin:auto; padding:48px 0 72px; }
-      .warning { display:inline-flex; gap:8px; align-items:center; padding:8px 12px; border:1px solid #f7b95566; border-radius:999px; color:#ffd58a; background:#f7b95512; font-size:.8rem; font-weight:800; letter-spacing:.08em; }
-      h1 { margin:20px 0 8px; font-size:clamp(2rem,7vw,4.5rem); line-height:.95; }
-      .lede { max-width:720px; color:#a9bdd4; font-size:1.05rem; line-height:1.65; }
-      .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin:36px 0; }
-      .card,.panel { border:1px solid #b9d7ff20; border-radius:18px; background:#0d1b2dcc; box-shadow:0 18px 60px #0004; }
-      .card { padding:22px; }
-      .label { color:#83a2c4; font-size:.78rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
-      .value { display:block; margin:12px 0; font-size:1.65rem; font-weight:800; }
-      .card p,.muted { color:#91a7bf; line-height:1.5; margin:0; }
-      .panel { padding:24px; margin-top:16px; }
-      .status { display:flex; justify-content:space-between; gap:16px; padding:13px 0; border-bottom:1px solid #b9d7ff18; }
-      .status:last-child { border:0; }
-      .pill { color:#86efac; font-weight:750; }
-      code { color:#b7d7ff; word-break:break-all; }
-      @media (max-width:560px){ main{padding-top:28px}.status{display:block}.pill{display:block;margin-top:6px} }
-    </style>
-  </head>
-  <body>
-    <main>
-      <span class="warning">⚠ DEVELOPMENT ONLY</span>
-      <h1>Jesse sandbox</h1>
-      <p class="lede">A safe operations view for the local Jesse intake platform. This page ships with empty and offline states only; it never exposes service tokens or claims that a real call, message, booking, or workflow occurred.</p>
-      <section class="grid" aria-label="Development metrics">
-        {cards.map(([label,value,description]) => <article class="card"><span class="label">{label}</span><strong class="value">{value}</strong><p>{description}</p></article>)}
-      </section>
-      <section class="panel">
-        <h2>System status</h2>
-        <div class="status"><span>API endpoint</span><code>{apiUrl}</code></div>
-        <div class="status"><span>Dashboard state</span><span class="pill">Offline-safe</span></div>
-        <div class="status"><span>External integrations</span><span class="pill">Disabled</span></div>
-        <div class="status"><span>Recent summaries</span><span class="muted">Empty — no development records loaded</span></div>
-      </section>
-      <section class="panel">
-        <h2>Integration health</h2>
-        {['Twilio','ElevenLabs','Google Calendar','Google Sheets','Gmail','n8n'].map(name => <div class="status"><span>{name}</span><span class="muted">Disabled · mock adapter available</span></div>)}
-      </section>
-      <section class="panel">
-        <h2>Deployment status</h2>
-        <div class="status"><span>Current version</span><code>{deployment.version}</code></div>
-        <div class="status"><span>Current commit</span><code>{deployment.commit}</code></div>
-        <div class="status"><span>Staging</span><span class="muted">{deployment.staging}</span></div>
-        <div class="status"><span>Production</span><span class="muted">{deployment.production}</span></div>
-        <div class="status"><span>Last test</span><span class="muted">{deployment.lastTest}</span></div>
-        <div class="status"><span>Previous known good</span><span class="muted">{deployment.previous}</span></div>
-        <div class="status"><span>Rollback</span><span class="muted">{deployment.rollback}</span></div>
-      </section>
-    </main>
-  </body>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Jesse Operations Dashboard</title>
+<style>
+:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background:#07111f; color:#eef6ff; }
+body { margin:0; min-height:100vh; background:radial-gradient(circle at top right,#15345d 0,transparent 35%),#07111f; }
+main { width:min(1100px,calc(100% - 32px)); margin:auto; padding:48px 0 72px; }
+.warning { display:inline-flex; gap:8px; align-items:center; padding:8px 12px; border:1px solid #f7b95566; border-radius:999px; color:#ffd58a; background:#f7b95512; font-size:.8rem; font-weight:800; letter-spacing:.08em; }
+.warning.ok { border-color:#86efac66; color:#86efac; background:#86efac12; }
+.warning.bad { border-color:#fca5a566; color:#fca5a5; background:#fca5a512; }
+h1 { margin:20px 0 8px; font-size:clamp(2rem,7vw,4rem); line-height:.95; }
+h2 { margin:0 0 6px; font-size:1.3rem; }
+.lede { max-width:720px; color:#a9bdd4; font-size:1.05rem; line-height:1.65; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin:24px 0; }
+.card,.panel { border:1px solid #b9d7ff20; border-radius:18px; background:#0d1b2dcc; box-shadow:0 18px 60px #0004; }
+.card { padding:20px; }
+.label { color:#83a2c4; font-size:.75rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
+.value { display:block; margin:10px 0; font-size:1.5rem; font-weight:800; }
+.card p,.muted { color:#91a7bf; line-height:1.5; margin:0; }
+.panel { padding:24px; margin-top:16px; }
+.status { display:flex; justify-content:space-between; gap:16px; padding:11px 0; border-bottom:1px solid #b9d7ff18; }
+.status:last-child { border:0; }
+.pill { font-weight:750; padding:2px 10px; border-radius:999px; font-size:.8rem; }
+.pill.ok { color:#86efac; background:#86efac1a; }
+.pill.warn { color:#ffd58a; background:#ffd58a1a; }
+.pill.bad { color:#fca5a5; background:#fca5a51a; }
+.pill.mock { color:#93c5fd; background:#93c5fd1a; }
+code { color:#b7d7ff; word-break:break-all; }
+table { width:100%; border-collapse:collapse; margin-top:12px; font-size:.9rem; }
+th,td { text-align:left; padding:8px 10px; border-bottom:1px solid #b9d7ff18; }
+th { color:#83a2c4; font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; }
+.toolbar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-top:28px; }
+button { background:#1c3a63; color:#eef6ff; border:1px solid #b9d7ff33; border-radius:10px; padding:9px 16px; font-weight:700; cursor:pointer; }
+button:hover { background:#254a7d; }
+form { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-top:16px; }
+label { display:flex; flex-direction:column; gap:6px; font-size:.85rem; color:#a9bdd4; }
+input { background:#0b1929; border:1px solid #b9d7ff33; border-radius:8px; padding:9px 12px; color:#eef6ff; min-width:220px; }
+.error-text { color:#fca5a5; font-size:.85rem; }
+.list-empty { color:#91a7bf; padding:10px 0; }
+@media (max-width:560px){ main{padding-top:28px}.status{display:block}.pill{display:inline-block;margin-top:6px} }
+</style>
+</head>
+<body>
+<main>
+<span class="warning" id="conn-badge">Checking connection...</span>
+<h1>Jesse operations dashboard</h1>
+<p class="lede">Live status for the Jesse intake pipeline, Make.com automation, and the SuccessBrand call center. Caller details and full conversation IDs are redacted before this page ever sees them.</p>
+
+<section class="panel" id="login-panel">
+<h2>Sign in</h2>
+<p class="muted">Sign in with a platform account that has at least viewer access. Credentials are sent directly to the platform API below and are never stored by this page.</p>
+<form id="login-form">
+<label>Username<input id="login-username" name="username" autocomplete="username" required /></label>
+<label>Password<input id="login-password" name="password" type="password" autocomplete="current-password" required /></label>
+<button type="submit">Sign in</button>
+</form>
+<p class="error-text" id="login-error"></p>
+<p class="muted">API endpoint: <code id="api-base-label"></code></p>
+</section>
+
+<section id="dashboard" hidden>
+<div class="toolbar">
+<span class="muted">Signed in as <strong id="whoami"></strong></span>
+<div>
+<button id="refresh-btn" type="button">Refresh</button>
+<button id="logout-btn" type="button">Sign out</button>
+</div>
+</div>
+
+<section class="panel">
+<h2>System health summary</h2>
+<div id="system-health" class="list-empty">Loading...</div>
+</section>
+
+<section class="panel">
+<h2>Jesse status</h2>
+<div id="jesse-status" class="list-empty">Loading...</div>
+</section>
+
+<section class="panel">
+<h2>Make automation</h2>
+<div id="make-status" class="list-empty">Loading...</div>
+</section>
+
+<section class="panel">
+<h2>Call center</h2>
+<div id="callcenter-status" class="list-empty">Loading...</div>
+</section>
+
+<section class="panel">
+<h2>Newest conversation</h2>
+<div id="conversation-status" class="list-empty">Loading...</div>
+</section>
+</section>
+</main>
+<script define:vars={{ apiBase }}>
+document.getElementById('api-base-label').textContent = apiBase;
+
+function escapeHtml(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function getToken() { return sessionStorage.getItem("sbh_access_token"); }
+function setToken(value) { sessionStorage.setItem("sbh_access_token", value); }
+function clearToken() { sessionStorage.removeItem("sbh_access_token"); sessionStorage.removeItem("sbh_username"); }
+
+function authFetch(path) {
+  return fetch(apiBase + path, { headers: { Authorization: "Bearer " + getToken() } }).then(function (res) {
+    if (res.status === 401 || res.status === 403) { throw new Error("not authorized (" + res.status + ")"); }
+    if (!res.ok) { throw new Error("request failed (" + res.status + ")"); }
+    return res.json();
+  });
+}
+
+function setBadge(state, text) {
+  var badge = document.getElementById("conn-badge");
+  badge.className = "warning " + state;
+  badge.textContent = text;
+}
+
+function pill(kind, text) { return "<span class=\"pill " + kind + "\">" + escapeHtml(text) + "</span>"; }
+
+function renderSystemHealth() {
+  var el = document.getElementById("system-health");
+  Promise.all([authFetch("/system/status"), fetch(apiBase + "/health").then(function (r) { return r.json(); })])
+    .then(function (results) {
+      var status = results[0]; var health = results[1];
+      var monitor = status.monitor || {};
+      var html = "";
+      html += "<div class=\"status\"><span>API health</span>" + pill(health.status === "ok" ? "ok" : "bad", health.status || "unknown") + "</div>";
+      html += "<div class=\"status\"><span>Environment</span><code>" + escapeHtml(status.environment) + "</code></div>";
+      html += "<div class=\"status\"><span>Queue depth</span><code>" + escapeHtml(status.queue_depth) + "</code></div>";
+      html += "<div class=\"status\"><span>Appointments on record</span><code>" + escapeHtml(status.appointments) + "</code></div>";
+      html += "<div class=\"status\"><span>Production ready</span>" + pill(status.production_ready ? "ok" : "warn", status.production_ready ? "yes" : "not yet") + "</div>";
+      if (monitor && Object.keys(monitor).length) {
+        html += "<div class=\"status\"><span>Monitor snapshot</span><code>" + escapeHtml(JSON.stringify(monitor)) + "</code></div>";
+      }
+      el.className = ""; el.innerHTML = html;
+      setBadge("ok", "Connected to platform API");
+    })
+    .catch(function (err) {
+      el.className = "list-empty"; el.textContent = "Unable to load system health: " + err.message;
+      setBadge("bad", "Platform API unreachable");
+    });
+}
+
+function renderJesseStatus() {
+  var el = document.getElementById("jesse-status");
+  authFetch("/ops/jesse-status").then(function (data) {
+    if (data.status === "not_configured") {
+      el.className = "list-empty";
+      el.textContent = "Not configured: " + (data.message || "Jesse integration is disabled until the Jesse API URL and dashboard access token are set.");
+      return;
+    }
+    var kind = data.status === "ok" ? "ok" : (data.status === "degraded" ? "warn" : "bad");
+    var html = "";
+    html += "<div class=\"status\"><span>Status</span>" + pill(kind, data.status) + "</div>";
+    html += "<div class=\"status\"><span>Reachable</span>" + pill(data.reachable ? "ok" : "bad", data.reachable ? "yes" : "no") + "</div>";
+    html += "<div class=\"status\"><span>Processed intakes</span><code>" + escapeHtml(data.processed_count === null || data.processed_count === undefined ? "-" : data.processed_count) + "</code></div>";
+    html += "<div class=\"status\"><span>Pending callbacks</span><code>" + escapeHtml(data.pending_callbacks === null || data.pending_callbacks === undefined ? "-" : data.pending_callbacks) + "</code></div>";
+    var counts = data.status_counts || {};
+    var countKeys = Object.keys(counts);
+    if (countKeys.length) {
+      html += countKeys.map(function (key) {
+        return "<div class=\"status\"><span>" + escapeHtml(key) + "</span><code>" + escapeHtml(counts[key]) + "</code></div>";
+      }).join("");
+    }
+    if (data.message) { html += "<p class=\"muted\" style=\"margin-top:10px\">" + escapeHtml(data.message) + "</p>"; }
+    if (data.error) { html += "<p class=\"error-text\">" + escapeHtml(data.error) + "</p>"; }
+    el.className = ""; el.innerHTML = html;
+  }).catch(function (err) {
+    el.className = "list-empty"; el.textContent = "Unable to load Jesse status: " + err.message;
+  });
+}
+
+function renderMakeStatus() {
+  var el = document.getElementById("make-status");
+  authFetch("/ops/make-status").then(function (data) {
+    if (data.status === "not_configured") {
+      el.className = "list-empty";
+      var missing = (data.missing_environment_variables || []).join(", ");
+      el.textContent = "Not configured" + (missing ? ": missing " + missing : "") + ".";
+      return;
+    }
+    var kind = data.status === "ok" ? "ok" : (data.status === "degraded" ? "warn" : "bad");
+    var html = "";
+    html += "<div class=\"status\"><span>Status</span>" + pill(kind, data.status) + "</div>";
+    var scenario = data.scenario;
+    if (scenario) {
+      html += "<div class=\"status\"><span>Scenario</span><code>" + escapeHtml(scenario.name || scenario.id) + "</code></div>";
+      html += "<div class=\"status\"><span>Scenario state</span>" + pill(scenario.active ? "ok" : "warn", scenario.active ? "active" : "inactive") + "</div>";
+    }
+    html += "<div class=\"status\"><span>Processed count</span><code>" + escapeHtml(data.processed_count === null || data.processed_count === undefined ? "-" : data.processed_count) + "</code></div>";
+    html += "<div class=\"status\"><span>Data Store cursor</span><code>" + escapeHtml(data.data_store_cursor === null || data.data_store_cursor === undefined ? "-" : data.data_store_cursor) + "</code></div>";
+    var executions = data.executions || [];
+    if (executions.length) {
+      html += "<table><thead><tr><th>Execution</th><th>Status</th><th>Started</th><th>Operations</th></tr></thead><tbody>";
+      html += executions.map(function (run) {
+        return "<tr><td>" + escapeHtml(run.id) + "</td><td>" + escapeHtml(run.status) + "</td><td>" + escapeHtml(run.started_at) + "</td><td>" + escapeHtml(run.operations) + "</td></tr>";
+      }).join("");
+      html += "</tbody></table>";
+    } else {
+      html += "<p class=\"list-empty\">No recent executions.</p>";
+    }
+    if (data.error) { html += "<p class=\"error-text\">" + escapeHtml(data.error) + "</p>"; }
+    el.className = ""; el.innerHTML = html;
+  }).catch(function (err) {
+    el.className = "list-empty"; el.textContent = "Unable to load Make status: " + err.message;
+  });
+}
+
+function renderCallCenter() {
+  var el = document.getElementById("callcenter-status");
+  Promise.all([authFetch("/callcenter/analytics"), authFetch("/callcenter/calls")]).then(function (results) {
+    var analytics = results[0]; var calls = results[1] || [];
+    var html = "";
+    if (analytics.mode === "mock") { html += pill("mock", "mock data") + "<br/>"; }
+    html += "<div class=\"grid\">";
+    html += "<div class=\"card\"><span class=\"label\">Total calls</span><strong class=\"value\">" + escapeHtml(analytics.total) + "</strong></div>";
+    html += "<div class=\"card\"><span class=\"label\">Successful</span><strong class=\"value\">" + escapeHtml(analytics.successful) + "</strong></div>";
+    html += "<div class=\"card\"><span class=\"label\">Failed</span><strong class=\"value\">" + escapeHtml(analytics.failed) + "</strong></div>";
+    html += "<div class=\"card\"><span class=\"label\">Transfer errors</span><strong class=\"value\">" + escapeHtml(analytics.transfer_errors) + "</strong></div>";
+    html += "<div class=\"card\"><span class=\"label\">Active</span><strong class=\"value\">" + escapeHtml(analytics.active) + "</strong></div>";
+    html += "<div class=\"card\"><span class=\"label\">Callback queue</span><strong class=\"value\">" + escapeHtml(analytics.callback_queue) + "</strong></div>";
+    html += "</div>";
+    if (calls.length) {
+      var recent = calls.slice(0, 10);
+      html += "<table><thead><tr><th>Caller</th><th>Agent</th><th>State</th><th>Outcome</th><th>Created</th></tr></thead><tbody>";
+      html += recent.map(function (call) {
+        return "<tr><td>" + escapeHtml(call.caller_redacted) + "</td><td>" + escapeHtml(call.agent) + "</td><td>" + escapeHtml(call.state) + "</td><td>" + escapeHtml(call.outcome || "-") + "</td><td>" + escapeHtml(call.created_at) + "</td></tr>";
+      }).join("");
+      html += "</tbody></table>";
+    } else {
+      html += "<p class=\"list-empty\">No calls recorded yet.</p>";
+    }
+    el.className = ""; el.innerHTML = html;
+  }).catch(function (err) {
+    el.className = "list-empty"; el.textContent = "Unable to load call center data: " + err.message;
+  });
+}
+
+function renderConversation() {
+  var el = document.getElementById("conversation-status");
+  authFetch("/ops/conversations/latest").then(function (data) {
+    if (data.status === "empty" || !data.conversation) {
+      el.className = "list-empty"; el.textContent = "No conversations recorded yet.";
+      return;
+    }
+    var conv = data.conversation;
+    var html = "";
+    html += "<div class=\"status\"><span>Conversation ID</span><code>" + escapeHtml(conv.conversation_id_redacted) + "</code></div>";
+    html += "<div class=\"status\"><span>Namespace</span><code>" + escapeHtml(conv.namespace) + "</code></div>";
+    html += "<div class=\"status\"><span>Created</span><code>" + escapeHtml(conv.created_at) + "</code></div>";
+    html += "<p class=\"muted\" style=\"margin-top:10px\">" + escapeHtml(conv.excerpt) + "</p>";
+    el.className = ""; el.innerHTML = html;
+  }).catch(function (err) {
+    el.className = "list-empty"; el.textContent = "Unable to load latest conversation: " + err.message;
+  });
+}
+
+function loadDashboard() {
+  renderSystemHealth();
+  renderJesseStatus();
+  renderMakeStatus();
+  renderCallCenter();
+  renderConversation();
+}
+
+function showDashboard(username) {
+  document.getElementById("login-panel").hidden = true;
+  document.getElementById("dashboard").hidden = false;
+  document.getElementById("whoami").textContent = username || "";
+  loadDashboard();
+}
+
+document.getElementById("login-form").addEventListener("submit", function (event) {
+  event.preventDefault();
+  var username = document.getElementById("login-username").value.trim();
+  var password = document.getElementById("login-password").value;
+  var errorEl = document.getElementById("login-error");
+  errorEl.textContent = "";
+  fetch(apiBase + "/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: username, password: password })
+  }).then(function (res) {
+    if (!res.ok) { throw new Error("invalid credentials or server error (" + res.status + ")"); }
+    return res.json();
+  }).then(function (data) {
+    setToken(data.access_token);
+    sessionStorage.setItem("sbh_username", username);
+    showDashboard(username);
+  }).catch(function (err) {
+    errorEl.textContent = err.message;
+    setBadge("bad", "Sign-in failed");
+  });
+});
+
+document.getElementById("logout-btn").addEventListener("click", function () {
+  clearToken();
+  document.getElementById("dashboard").hidden = true;
+  document.getElementById("login-panel").hidden = false;
+  setBadge("", "Signed out");
+});
+
+document.getElementById("refresh-btn").addEventListener("click", loadDashboard);
+
+(function init() {
+  var token = getToken();
+  if (token) { showDashboard(sessionStorage.getItem("sbh_username")); }
+  else { setBadge("", "Signed out"); }
+})();
+</script>
+</body>
 </html>

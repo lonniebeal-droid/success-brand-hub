@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -39,6 +40,8 @@ from integrations.gmail_sandbox import create_gmail_sandbox_router
 from integrations.n8n_sandbox import create_n8n_sandbox_router
 from integrations.twilio_sandbox import create_twilio_sandbox_router
 from integrations.elevenlabs_sandbox import create_elevenlabs_sandbox_router
+from integrations.jesse_status_adapter import get_jesse_status
+from integrations.make_adapter import get_make_status
 
 
 class LoginRequest(BaseModel):
@@ -108,6 +111,14 @@ def create_app(database: Database | None = None) -> FastAPI:
     orchestrator = AgentOrchestrator(queue)
     content_system = SuccessBrandContentSystem()
     app = FastAPI(title="Success Brand Platform v2", version="2.0.0")
+    allowed_origins = [origin.strip() for origin in os.getenv("PLATFORM_ALLOWED_ORIGINS", "*").split(",") if origin.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins or ["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.include_router(create_crm_router(db))
     app.include_router(create_callcenter_router(db))
     app.include_router(create_google_sheets_router(db))
@@ -217,6 +228,21 @@ def create_app(database: Database | None = None) -> FastAPI:
     @app.get("/conversations/{conversation_id}/summary")
     def conversation_summary(conversation_id: str, _: dict = Depends(require_role("viewer"))):
         return memory.summarize(conversation_id)
+
+    @app.get("/ops/conversations/latest")
+    def latest_conversation(_: dict = Depends(require_role("viewer"))):
+        result = memory.latest_conversation()
+        if not result:
+            return {"status": "empty", "conversation": None}
+        return {"status": "ok", "conversation": result}
+
+    @app.get("/ops/jesse-status")
+    def jesse_status(_: dict = Depends(require_role("viewer"))):
+        return get_jesse_status()
+
+    @app.get("/ops/make-status")
+    def make_status(_: dict = Depends(require_role("viewer"))):
+        return get_make_status()
 
     @app.post("/notifications", status_code=201)
     def notify(payload: NotificationRequest, _: dict = Depends(require_role("manager"))):
