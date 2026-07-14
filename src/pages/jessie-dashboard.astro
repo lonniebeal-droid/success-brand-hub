@@ -160,7 +160,7 @@ function renderJesseStatus() {
   authFetch("/ops/jesse-status").then(function (data) {
     if (data.status === "not_configured") {
       el.className = "list-empty";
-      el.textContent = "Not configured: " + (data.message || "Jesse integration is disabled until JESSE_API_URL and JESSE_DASHBOARD_TOKEN are set.");
+      el.textContent = "Not configured: " + (data.message || "Jesse integration is disabled until the Jesse API URL and dashboard access token are set.");
       return;
     }
     var kind = data.status === "ok" ? "ok" : (data.status === "degraded" ? "warn" : "bad");
