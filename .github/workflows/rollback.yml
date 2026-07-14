@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v
         with:
           ref: ${{ inputs.target_sha }}
       - uses: actions/setup-python@v5
