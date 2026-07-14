@@ -5,7 +5,8 @@ token is read from an environment variable at request time only, and the
 values returned by Jesse's own reporting endpoints are already redacted
 aggregate counts (see agents/jessie/src/reporting_service.py). When Jesse is
 not configured or is unreachable, this adapter returns a clearly labelled
-empty/error state instead of raising.
+empty/error state instead of raising, and makes zero network calls unless
+both the API address and the dashboard access token are present.
 """
 from __future__ import annotations
 
@@ -43,29 +44,41 @@ def _api_url() -> str | None:
     return value
 
 
+def _not_configured(message: str, *, reachable: bool = False, configured: bool = False) -> dict[str, Any]:
+    return {
+        "status": "not_configured",
+        "configured": configured,
+        "reachable": reachable,
+        "message": message,
+        "processed_count": None,
+        "pending_callbacks": None,
+        "status_counts": {},
+        "integration_health": {},
+        "error": None,
+    }
+
+
 def get_jesse_status(transport: Transport = _http_json) -> dict[str, Any]:
     """Return a dashboard-safe snapshot of the Jesse intake API's health.
 
     The returned "status" is one of "not_configured", "unavailable",
     "degraded", or "ok". Caller identity is never included; only aggregate
-    counts already produced by Jesse's reporting service are surfaced. The
-    dashboard access token itself is never read into any returned value.
+    counts already produced by Jesse's reporting service are surfaced. If
+    either the API address or the dashboard access token is missing, this
+    function returns immediately without making any network call.
     """
     base = _api_url()
     token = os.getenv(_JESSE_DASHBOARD_TOKEN_VAR, "").strip()
 
     if not base:
-        return {
-            "status": "not_configured",
-            "configured": False,
-            "reachable": False,
-            "message": "The Jesse API address is not set for this dashboard.",
-            "processed_count": None,
-            "pending_callbacks": None,
-            "status_counts": {},
-            "integration_health": {},
-            "error": None,
-        }
+        return _not_configured("The Jesse API address is not set for this dashboard.")
+
+    if not token:
+        return _not_configured(
+            "The Jesse dashboard access token is not set; authenticated reports are unavailable.",
+            reachable=False,
+            configured=False,
+        )
 
     timeout = DEFAULT_TIMEOUT_SECONDS
     try:
@@ -73,7 +86,7 @@ def get_jesse_status(transport: Transport = _http_json) -> dict[str, Any]:
     except _NETWORK_ERRORS:
         return {
             "status": "unavailable",
-            "configured": bool(token),
+            "configured": True,
             "reachable": False,
             "message": "Jesse API is not reachable from this environment.",
             "processed_count": None,
@@ -81,19 +94,6 @@ def get_jesse_status(transport: Transport = _http_json) -> dict[str, Any]:
             "status_counts": {},
             "integration_health": {},
             "error": "Jesse API health check failed.",
-        }
-
-    if not token:
-        return {
-            "status": "not_configured",
-            "configured": False,
-            "reachable": True,
-            "message": "The Jesse dashboard access token is not set; authenticated reports are unavailable.",
-            "processed_count": None,
-            "pending_callbacks": None,
-            "status_counts": {},
-            "integration_health": {},
-            "error": None,
         }
 
     headers = {"X-API-Key": token, "Accept": "application/json"}
