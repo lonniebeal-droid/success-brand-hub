@@ -2,11 +2,17 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from core.database.database import Database
 from core.database.models import Base
 from .models import AgentAvailability, CallRecord
+
+# Recognized call outcomes used by the operations dashboard. These are
+# documented values for the free-text CallRecord.outcome column; unrecognized
+# free-text outcomes remain supported and are simply not bucketed below.
+FAILED_OUTCOMES = ("failed", "no_answer", "voicemail_only", "dropped")
+TRANSFER_ERROR_OUTCOME = "transfer_error"
 
 
 class CallCenterService:
@@ -33,10 +39,11 @@ class CallCenterService:
             call.timeline = [*call.timeline, {"event": state, "at": datetime.now(timezone.utc).isoformat(), "outcome": outcome}]
             session.commit(); return call
 
-    def list_calls(self, state: str | None = None) -> list[CallRecord]:
+    def list_calls(self, state: str | None = None, outcome: str | None = None) -> list[CallRecord]:
         with self.database.session() as session:
             query = select(CallRecord)
             if state: query = query.where(CallRecord.state == state)
+            if outcome: query = query.where(CallRecord.outcome == outcome)
             return list(session.scalars(query.order_by(CallRecord.created_at.desc())).all())
 
     def set_availability(self, agent: str, status: str) -> AgentAvailability:
@@ -46,8 +53,29 @@ class CallCenterService:
 
     def analytics(self) -> dict:
         with self.database.session() as session:
-            total = session.scalar(select(func.count()).select_from(CallRecord)) or 0
-            missed = session.scalar(select(func.count()).select_from(CallRecord).where(CallRecord.state == "missed")) or 0
-            active = session.scalar(select(func.count()).select_from(CallRecord).where(CallRecord.state == "active")) or 0
-            callbacks = session.scalar(select(func.count()).select_from(CallRecord).where(CallRecord.state == "callback")) or 0
-        return {"mode": "mock", "total": total, "missed": missed, "active": active, "callback_queue": callbacks}
+            def count(*conditions) -> int:
+                query = select(func.count()).select_from(CallRecord)
+                for condition in conditions:
+                    query = query.where(condition)
+                return session.scalar(query) or 0
+
+            total = count()
+            missed = count(CallRecord.state == "missed")
+            active = count(CallRecord.state == "active")
+            callbacks = count(CallRecord.state == "callback")
+            transfer_errors = count(CallRecord.outcome == TRANSFER_ERROR_OUTCOME)
+            failed = count(or_(CallRecord.state == "missed", CallRecord.outcome.in_(FAILED_OUTCOMES)))
+            successful = count(
+                CallRecord.state == "completed",
+                or_(CallRecord.outcome.is_(None), CallRecord.outcome.not_in((*FAILED_OUTCOMES, TRANSFER_ERROR_OUTCOME))),
+            )
+            return {
+                "mode": "mock",
+                "total": total,
+                "missed": missed,
+                "active": active,
+                "callback_queue": callbacks,
+                "successful": successful,
+                "failed": failed,
+                "transfer_errors": transfer_errors,
+            }
