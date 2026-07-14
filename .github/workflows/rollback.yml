@@ -27,5 +27,5 @@ jobs:
       - name: Rollback summary
         run: |
           echo '## Jesse rollback event' >> "$GITHUB_STEP_SUMMARY"
-          echo "Approved rollback target: \`${{ inputs.target_sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Approved rollback target: \\`${{ inputs.target_sha }}\\`" >> "$GITHUB_STEP_SUMMARY"
           echo 'External action remains disabled in the v1 adapter.' >> "$GITHUB_STEP_SUMMARY"
