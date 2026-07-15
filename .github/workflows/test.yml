@@ -45,6 +45,8 @@ jobs:
           PY
       - name: Build Platform API Docker image
         run: docker build -f Dockerfile.platform-api -t platform-api-ci .
+      - name: Verify agents package in built image
+        run: docker run --rm platform-api-ci python -c "import agents; import core.platform_api; import integrations.google_sheets_sandbox.router; print('agents, core.platform_api, and integrations.google_sheets_sandbox.router import successfully from the built image')"
       - name: Build Astro
         env:
           ASTRO_TELEMETRY_DISABLED: "1"
