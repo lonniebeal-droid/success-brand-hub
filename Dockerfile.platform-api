@@ -16,8 +16,8 @@ COPY callcenter ./callcenter
 COPY integrations ./integrations
 
 RUN useradd --create-home --uid 10001 appuser \
-    && mkdir -p /tmp/platform \
-    && chown -R appuser:appuser /tmp/platform
+    && mkdir -p /tmp/platform agents/jessie/data \
+    && chown -R appuser:appuser /tmp/platform agents/jessie/data
 
 USER appuser
 
