@@ -31,6 +31,8 @@ jobs:
         run: python -m pytest agents/content/tests -q
       - name: Test ops dashboard
         run: python -m pytest tests/test_business_operations.py tests/test_ops_dashboard.py -q
+      - name: Test platform admin bootstrap
+        run: python -m pytest tests/test_platform_admin_bootstrap.py -q
       - name: Platform API import and startup test
         shell: bash
         env:
