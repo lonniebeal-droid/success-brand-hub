@@ -79,6 +79,8 @@ jobs:
         env:
           JESSE_DASHBOARD_TOKEN: ${{ secrets.JESSE_DASHBOARD_TOKEN }}
           MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+          PLATFORM_BOOTSTRAP_ADMIN_USERNAME: ${{ secrets.PLATFORM_BOOTSTRAP_ADMIN_USERNAME }}
+          PLATFORM_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.PLATFORM_BOOTSTRAP_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
           cat > /tmp/platform-api-env.yaml <<EOF
@@ -92,6 +94,8 @@ jobs:
           MAKE_STATUS_SCENARIO_ID: "5654355"
           MAKE_DATA_STORE_ID: "118014"
           MAKE_DATA_STORE_CURSOR_KEY: "1"
+          PLATFORM_BOOTSTRAP_ADMIN_USERNAME: "${PLATFORM_BOOTSTRAP_ADMIN_USERNAME}"
+          PLATFORM_BOOTSTRAP_ADMIN_PASSWORD: "${PLATFORM_BOOTSTRAP_ADMIN_PASSWORD}"
           EOF
           gcloud run deploy "$SERVICE_NAME" \
             --image "$IMAGE" \
