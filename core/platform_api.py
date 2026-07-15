@@ -100,8 +100,28 @@ def _public(model: Any) -> dict[str, Any]:
     return {column.name: getattr(model, column.name) for column in model.__table__.columns}
 
 
+def _bootstrap_admin_if_needed(db: Database) -> None:
+    """Create exactly one admin user from environment variables on startup.
+
+    This only runs when both PLATFORM_BOOTSTRAP_ADMIN_USERNAME and
+    PLATFORM_BOOTSTRAP_ADMIN_PASSWORD are set and the User table is still
+    empty. It never overwrites or duplicates existing users, reuses the
+    existing create_user() helper so the password is hashed the normal way,
+    and never logs the username or password.
+    """
+    username = os.getenv("PLATFORM_BOOTSTRAP_ADMIN_USERNAME")
+    password = os.getenv("PLATFORM_BOOTSTRAP_ADMIN_PASSWORD")
+    if not username or not password:
+        return
+    with db.session() as session:
+        if session.scalar(select(User)) is not None:
+            return
+        create_user(session, username, password, "admin")
+
+
 def create_app(database: Database | None = None) -> FastAPI:
     db = database or get_database()
+    _bootstrap_admin_if_needed(db)
     queue = PersistentTaskQueue(db)
     worker = BackgroundWorker(queue)
     memory = PersistentMemoryEngine(db)
@@ -160,7 +180,7 @@ def create_app(database: Database | None = None) -> FastAPI:
     def logout(payload: RefreshRequest, _: dict = Depends(require_user)):
         with db.session() as session:
             revoke_refresh_token(session, payload.refresh_token)
-        return {"logged_out": True}
+            return {"logged_out": True}
 
     @app.get("/me")
     def me(user: dict = Depends(require_user)):
