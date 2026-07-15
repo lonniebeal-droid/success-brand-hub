@@ -9,14 +9,15 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY agents ./agents
 COPY core ./core
 COPY crm ./crm
 COPY callcenter ./callcenter
 COPY integrations ./integrations
 
 RUN useradd --create-home --uid 10001 appuser \
-    && mkdir -p /tmp/platform \
-    && chown -R appuser:appuser /tmp/platform
+    && mkdir -p /tmp/platform agents/jessie/data \
+    && chown -R appuser:appuser /tmp/platform agents/jessie/data
 
 USER appuser
 
