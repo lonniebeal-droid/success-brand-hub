@@ -1,0 +1,6 @@
+[build]
+  command = "PUBLIC_PLATFORM_API_URL='https://success-brand-platform-api-staging-3sqar3u4sq-uc.a.run.app' npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"

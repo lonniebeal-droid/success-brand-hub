@@ -113,7 +113,7 @@ jobs:
             --quiet
           rm -f /tmp/platform-api-env.yaml
 
-      - name: Verify health and report
+      - name: Verify health, CORS preflight, and report
         shell: bash
         run: |
           set -euo pipefail
@@ -126,6 +126,15 @@ jobs:
             echo "Expected a public health check, received HTTP $public_status" >&2
             exit 1
           fi
+          cors_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X OPTIONS "$service_url/login" \
+            -H 'Origin: https://successbrandorg.netlify.app' \
+            -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: content-type')"
+          if [[ "$cors_status" != "200" && "$cors_status" != "204" ]]; then
+            echo "Expected CORS preflight success for dashboard login, received HTTP $cors_status" >&2
+            exit 1
+          fi
           {
             echo '## Platform API staging deployment'
             echo "- Commit: \`$TARGET_SHA\`"
@@ -133,6 +142,6 @@ jobs:
             echo "- Region: \`$REGION\`"
             echo "- URL: $service_url"
             echo '- Access: public endpoint; application-level JWT auth enforced by the API itself'
-            echo '- CORS: restricted to https://successbrandorg.netlify.app'
+            echo '- CORS: restricted to https://successbrandorg.netlify.app; dashboard preflight verified'
             echo '- Existing success-brand-jesse-staging service: not modified'
           } >> "$GITHUB_STEP_SUMMARY"
