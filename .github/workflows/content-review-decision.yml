@@ -51,7 +51,7 @@ jobs:
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
