@@ -86,7 +86,7 @@ jobs:
           cat > /tmp/platform-api-env.yaml <<EOF
           PLATFORM_ENVIRONMENT: "staging"
           PLATFORM_DATABASE_URL: "sqlite:////tmp/platform/platform.db"
-          PLATFORM_ALLOWED_ORIGINS: "*"
+          PLATFORM_ALLOWED_ORIGINS: "https://successbrandorg.netlify.app"
           JESSE_API_URL: "https://success-brand-jesse-staging-3sqar3u4sq-uc.a.run.app"
           JESSE_DASHBOARD_TOKEN: "${JESSE_DASHBOARD_TOKEN}"
           MAKE_API_BASE_URL: "https://us2.make.com/api/v2"
@@ -142,6 +142,6 @@ jobs:
             echo "- Region: \`$REGION\`"
             echo "- URL: $service_url"
             echo '- Access: public endpoint; application-level JWT auth enforced by the API itself'
-            echo '- CORS: wildcard origin allowed with credentials disabled, plus dashboard preflight verified'
+            echo '- CORS: restricted to https://successbrandorg.netlify.app; dashboard preflight verified'
             echo '- Existing success-brand-jesse-staging service: not modified'
           } >> "$GITHUB_STEP_SUMMARY"
