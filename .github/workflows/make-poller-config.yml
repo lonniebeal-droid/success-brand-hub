@@ -54,7 +54,7 @@ jobs:
             --target staging \
             --resource-id-env MAKE_APPOINTMENT_SCENARIO_ID \
             --output exported/jesse-intake-poller.staging.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: inputs.operation == 'export'
         with:
           name: redacted-jesse-intake-poller-${{ github.run_id }}
