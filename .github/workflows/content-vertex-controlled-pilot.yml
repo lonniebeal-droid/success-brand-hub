@@ -25,7 +25,7 @@ jobs:
       CONTENT_STORAGE_MODE: gcs
       CONTENT_ASSET_BUCKET: ${{ vars.CONTENT_ASSET_BUCKET }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
