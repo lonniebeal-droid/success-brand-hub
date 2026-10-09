@@ -103,7 +103,18 @@ def test_redacted_logs(temp_service, capsys):
     captured = capsys.readouterr().out
     assert "ada@example.com" not in captured
     assert "example.com" not in captured
-    assert "4567" in captured
+    assert "4567" not in captured
+    assert "Event=created" in captured
+    assert "Sensitive=[redacted email]" in captured
+    assert "Phone=[on file]" in captured
+
+    temp_service.log_intake_event("callback", "(555) 123-4567")
+    captured = capsys.readouterr().out
+    assert "4567" not in captured and "555" not in captured
+    assert "Event=callback Sensitive=[redacted phone]" in captured
+
+    temp_service.log_intake_event("heartbeat")
+    assert "Sensitive=[redacted none]" in capsys.readouterr().out
 
 
 def test_local_storage(temp_service):
@@ -181,6 +192,71 @@ def test_redacted_summary(temp_service):
 
     summary = generate_redacted_summary(service=temp_service, intake_id=intake["id"])
     assert "Ada Lovelace" in summary
-    assert "4567" in summary
+    assert "4567" not in summary
+    assert "Phone: [on file]" in summary
+    assert f"Intake {intake['id'][:8]}" in summary
+    assert "Urgency: high" in summary
     assert "ada@example.com" not in summary
     assert "example.com" not in summary
+
+
+@pytest.mark.parametrize(
+    "email,expected",
+    [
+        ("ada@example.com", True),
+        ("  ada@example.com  ", True),
+        ("a@b.c", True),
+        ("a@b.c.", True),  # same as the previous regex: some dot has characters on both sides
+        ("a@sub.example.co.uk", True),
+        ("", False),
+        ("ada", False),
+        ("ada@", False),
+        ("@example.com", False),
+        ("ada@example", False),
+        ("ada@.com", False),
+        ("ada@example.", False),
+        ("ada@@example.com", False),
+        ("ada@exa@mple.com", False),
+        ("ada lovelace@example.com", False),
+        ("ada@exam ple.com", False),
+    ],
+)
+def test_email_validation_semantics(email, expected):
+    assert IntakeService._is_valid_email(email) is expected
+
+
+def test_email_validation_is_linear_on_pathological_input():
+    import time
+
+    # CodeQL py/polynomial-redos: the old regex backtracked polynomially on
+    # strings starting with "!@!." followed by many repetitions of "!.".
+    pathological = "!@!." + "!." * 50_000 + "@"
+    start = time.perf_counter()
+    assert IntakeService._is_valid_email(pathological) is False
+    assert IntakeService._is_valid_email("!@!." + "!." * 50_000 + " ") is True  # trailing space is stripped
+    assert IntakeService._is_valid_email("!@!." + "!." * 50_000 + " x") is False
+    assert time.perf_counter() - start < 0.5
+
+
+def test_presence_marker_never_contains_value():
+    assert IntakeService._presence("(555) 123-4567") == "[on file]"
+    assert IntakeService._presence("") == "[not provided]"
+    assert IntakeService._presence(None) == "[not provided]"
+    assert IntakeService._presence("   ") == "[not provided]"
+
+
+def test_daily_report_only_contains_integer_counts(temp_service):
+    from agents.jessie.src.reporting_service import ReportingService
+
+    report = ReportingService(
+        temp_service,
+        metrics={"mock_appointments": "3", "mock_sheet_writes": 2, "mock_follow_up_emails": {"to": "x@example.com"}},
+        integration_health={},
+    ).daily_report()
+    assert report["integrations"] == {
+        "mock_appointments": 3,
+        "mock_sheet_writes": 2,
+        "mock_follow_up_emails": 0,
+        "mock_n8n_events": 0,
+    }
+    assert "example.com" not in json.dumps(report)

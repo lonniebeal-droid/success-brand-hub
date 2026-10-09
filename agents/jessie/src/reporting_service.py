@@ -21,10 +21,10 @@ class ReportingService:
                 "urgency_counts": self._urgency_counts(),
             },
             "integrations": {
-                "mock_appointments": self.metrics.get("mock_appointments", 0),
-                "mock_sheet_writes": self.metrics.get("mock_sheet_writes", 0),
-                "mock_follow_up_emails": self.metrics.get("mock_follow_up_emails", 0),
-                "mock_n8n_events": self.metrics.get("mock_n8n_events", 0),
+                "mock_appointments": self._count("mock_appointments"),
+                "mock_sheet_writes": self._count("mock_sheet_writes"),
+                "mock_follow_up_emails": self._count("mock_follow_up_emails"),
+                "mock_n8n_events": self._count("mock_n8n_events"),
             },
             "mode": "mock",
             "sandbox": True,
@@ -53,6 +53,14 @@ class ReportingService:
 
     def system_status(self) -> Dict[str, Any]:
         return {"status": "ok", "mode": "mock", "sandbox": True, "integrations": self.integration_health, "metrics": self.security_report()}
+
+    def _count(self, key: str) -> int:
+        """Report metrics as plain integer counts only (never raw metric payloads)."""
+        value = self.metrics.get(key, 0)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
 
     def _status_counts(self) -> Dict[str, int]:
         counts: Dict[str, int] = {}
