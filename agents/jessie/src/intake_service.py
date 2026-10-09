@@ -82,24 +82,25 @@ class IntakeService:
             raise LookupError(f"Intake {intake_id} not found")
         return (
             f"Intake {intake['id'][:8]} | {intake['caller_name']} | "
-            f"Urgency: {intake['urgency']} | Phone: {self._redact_phone(intake['phone_number'])} | "
+            f"Urgency: {intake['urgency']} | Phone: {self._presence(intake['phone_number'])} | "
             f"Email: {self._redact_email(intake['email'])} | Status: {intake['status']}"
         )
 
     def log_intake_event(self, event: str, sensitive_value: Optional[str] = None) -> None:
+        # Only log the *kind* of sensitive value and whether a phone is on file.
+        # No characters of the phone number or email are written to logs.
         if not sensitive_value:
-            redacted_sensitive = "[redacted]"
+            sensitive_kind = "none"
         elif "@" in sensitive_value:
-            redacted_sensitive = self._redact_email(sensitive_value)
+            sensitive_kind = "email"
         else:
-            redacted_sensitive = self._redact_phone(sensitive_value)
+            sensitive_kind = "phone"
 
         phone_context = ""
         if self._records:
-            latest_phone = self._records[-1].get("phone_number")
-            phone_context = f" Phone={self._redact_phone(latest_phone)}"
+            phone_context = f" Phone={self._presence(self._records[-1].get('phone_number'))}"
 
-        print(f"Event={event} Sensitive={redacted_sensitive}{phone_context}")
+        print(f"Event={event} Sensitive=[redacted {sensitive_kind}]{phone_context}")
 
     def _validate(
         self,
@@ -130,8 +131,16 @@ class IntakeService:
 
     @staticmethod
     def _is_valid_email(email: str) -> bool:
-        pattern = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-        return bool(pattern.fullmatch(email.strip()))
+        # Linear-time equivalent of r"^[^@\s]+@[^@\s]+\.[^@\s]+$" (the regex was
+        # vulnerable to polynomial backtracking / ReDoS on inputs like "!@!." + "!." * n).
+        email = email.strip()
+        if not email or any(ch.isspace() for ch in email):
+            return False
+        local, sep, domain = email.partition("@")
+        if not sep or not local or "@" in domain:
+            return False
+        # Domain needs a dot with at least one character on each side.
+        return "." in domain[1:-1]
 
     @staticmethod
     def _normalize_phone(phone_number: str) -> str:
@@ -148,6 +157,11 @@ class IntakeService:
         if len(digits) <= 4:
             return "***" + digits[-4:]
         return "***" + digits[-4:]
+
+    @staticmethod
+    def _presence(value: Optional[str]) -> str:
+        """Fully masked marker for log/summary output; never derived from the value's characters."""
+        return "[on file]" if value and str(value).strip() else "[not provided]"
 
     @staticmethod
     def _redact_email(value: Optional[str]) -> str:
