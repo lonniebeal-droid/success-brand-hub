@@ -40,7 +40,7 @@ jobs:
       MAKE_CANCELLATION_SCENARIO_ID: ${{ vars.MAKE_CANCELLATION_SCENARIO_ID }}
       MAKE_RESCHEDULE_SCENARIO_ID: ${{ vars.MAKE_RESCHEDULE_SCENARIO_ID }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"

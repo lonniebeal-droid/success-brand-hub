@@ -18,7 +18,7 @@ jobs:
       SERVICE_URL: https://success-brand-jesse-staging-708353059015.us-central1.run.app
       REGION: us-central1
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Authenticate to Google Cloud
         id: google-auth

@@ -14,7 +14,7 @@ jobs:
       API_KEY: ${{ secrets.ELEVENLABS_SANDBOX_API_KEY }}
       AGENT_ID: ${{ vars.ELEVENLABS_SANDBOX_AGENT_ID }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Verify staging agent exists without starting a conversation
         shell: bash
         run: |

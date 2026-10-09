@@ -40,7 +40,7 @@ jobs:
       GOOGLE_SHEETS_MODE: ${{ vars.GOOGLE_SHEETS_MODE }}
       GOOGLE_SHEETS_SANDBOX_ENABLED: ${{ vars.GOOGLE_SHEETS_SANDBOX_ENABLED }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.TARGET_SHA }}
       - id: auth

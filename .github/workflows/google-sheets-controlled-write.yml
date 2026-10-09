@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Authenticate to Google Cloud with WIF
         id: google-auth
