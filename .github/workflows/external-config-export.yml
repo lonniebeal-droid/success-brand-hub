@@ -41,7 +41,7 @@ jobs:
       MAKE_RESCHEDULE_SCENARIO_ID: ${{ vars.MAKE_RESCHEDULE_SCENARIO_ID }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Export and redact provider config
