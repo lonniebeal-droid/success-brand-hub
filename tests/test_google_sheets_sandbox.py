@@ -166,3 +166,39 @@ def test_disabled_and_not_found_have_explicit_api_contracts(db, monkeypatch):
 
     missing = manager.post("/sandbox/google-sheets/leads/missing", headers=headers)
     assert missing.status_code == 404 and missing.json()["error"]["code"] == "not_found"
+
+
+def test_error_details_are_logged_server_side_not_returned(db, monkeypatch, caplog):
+    detail = "Google Sheets target is not on the staging allowlist: internal-sheet-id-must-not-leak"
+
+    def boom(self, lead_id, rid):
+        raise GoogleSheetsSandboxError(detail)
+
+    monkeypatch.setattr(GoogleSheetsSandboxService, "write_lead", boom)
+    manager, headers = auth_client(db, monkeypatch, "manager")
+    with caplog.at_level("WARNING", logger="integrations.google_sheets_sandbox.router"):
+        result = manager.post("/sandbox/google-sheets/leads/any", headers=headers)
+    assert result.status_code == 400
+    body = result.json()["error"]
+    assert body == {"code": "validation_error", "message": "Google Sheets sandbox request was rejected", "request_id": "request-manager"}
+    assert "internal-sheet-id-must-not-leak" not in result.text and "Traceback" not in result.text
+    assert "internal-sheet-id-must-not-leak" in caplog.text and "request-manager" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "detail,status_code,code",
+    [
+        ("record already written to sandbox", 409, "duplicate"),
+        ("CRM lead not found", 404, "not_found"),
+        ("sandbox write failed safely", 502, "upstream_error"),
+    ],
+)
+def test_error_codes_use_fixed_client_messages(db, monkeypatch, detail, status_code, code):
+    def boom(self, lead_id, rid):
+        raise GoogleSheetsSandboxError(detail)
+
+    monkeypatch.setattr(GoogleSheetsSandboxService, "write_lead", boom)
+    manager, headers = auth_client(db, monkeypatch, "manager")
+    result = manager.post("/sandbox/google-sheets/leads/any", headers=headers)
+    assert result.status_code == status_code and result.json()["error"]["code"] == code
+    assert result.json()["error"]["message"] != detail

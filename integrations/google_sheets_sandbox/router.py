@@ -1,5 +1,6 @@
 from collections import defaultdict, deque
 from time import monotonic
+import logging
 import os
 import re
 import uuid
@@ -12,6 +13,16 @@ from agents.jessie.src.intake_service import IntakeService
 from core.auth import require_role
 from core.database.database import Database
 from .service import GoogleSheetsSandboxService
+
+logger = logging.getLogger(__name__)
+
+# Fixed, client-safe messages. Exception details stay in server-side logs only.
+CLIENT_ERROR_MESSAGES = {
+    "duplicate": "Record was already written to the Google Sheets sandbox",
+    "not_found": "Record not found",
+    "upstream_error": "Google Sheets sandbox write failed safely",
+    "validation_error": "Google Sheets sandbox request was rejected",
+}
 
 
 def create_google_sheets_router(database: Database, adapter: GoogleSheetsAdapter | None = None, intake_service: IntakeService | None = None) -> APIRouter:
@@ -36,17 +47,18 @@ def create_google_sheets_router(database: Database, adapter: GoogleSheetsAdapter
         result = JSONResponse(safe, status_code=status_code); result.headers["X-Request-ID"] = rid; return result
 
     def error_response(exc: GoogleSheetsSandboxError, rid: str) -> JSONResponse:
-        message = str(exc)
-        if "already written" in message:
+        detail = str(exc)
+        if "already written" in detail:
             code, status_code = "duplicate", 409
-        elif "not found" in message:
+        elif "not found" in detail:
             code, status_code = "not_found", 404
-        elif message in {"sandbox sheet write failed safely", "sandbox write failed safely"}:
+        elif detail in {"sandbox sheet write failed safely", "sandbox write failed safely"}:
             code, status_code = "upstream_error", 502
-            message = "Google Sheets sandbox write failed safely"
         else:
             code, status_code = "validation_error", 400
-        return response({"error": {"code": code, "message": message, "request_id": rid}}, rid, status_code)
+        # Log the exception details server-side; never echo them back to the client.
+        logger.warning("google_sheets_sandbox.error code=%s request_id=%s", code, rid, exc_info=exc)
+        return response({"error": {"code": code, "message": CLIENT_ERROR_MESSAGES[code], "request_id": rid}}, rid, status_code)
 
     def write_response(payload: dict, rid: str) -> JSONResponse:
         if payload.get("status") == "disabled":
