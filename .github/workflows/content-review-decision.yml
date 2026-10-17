@@ -128,7 +128,7 @@ jobs:
           PY
 
       - name: Upload decision receipt
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: successbrand-content-review-decision-${{ github.run_id }}
           path: review-decision.json
