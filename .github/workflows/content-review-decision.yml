@@ -42,7 +42,7 @@ jobs:
       REVIEWER: ${{ github.actor }}
       REVIEW_RUN_ID: ${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
