@@ -46,7 +46,10 @@ jobs:
           print('core.platform_api imports and creates an app successfully')
           PY
       - name: Build Platform API Docker image
-        run: docker build -f Dockerfile.platform-api -t platform-api-ci .
+        run: |
+          docker pull public.ecr.aws/docker/library/python:3.12-slim
+          docker tag public.ecr.aws/docker/library/python:3.12-slim python:3.12-slim
+          docker build --pull=false -f Dockerfile.platform-api -t platform-api-ci .
       - name: Verify agents package in built image
         run: docker run --rm platform-api-ci python -c "import agents; import core.platform_api; import integrations.google_sheets_sandbox.router; print('agents, core.platform_api, and integrations.google_sheets_sandbox.router import successfully from the built image')"
       - name: Build Astro
