@@ -18,7 +18,7 @@ jobs:
       # Check out the trusted ref this workflow was dispatched from, NOT the dispatch input.
       # Code from an arbitrary input SHA must not run with default-branch cache write access
       # (CodeQL actions/cache-poisoning/poisonable-step). The input SHA is only verified below.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -37,7 +37,7 @@ jobs:
           if ! git merge-base --is-ancestor "$REQUESTED_SHA" "origin/$DEFAULT_BRANCH"; then
             echo "::error::target_sha is not reachable from $DEFAULT_BRANCH"; exit 1
           fi
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
