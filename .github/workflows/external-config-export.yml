@@ -40,8 +40,8 @@ jobs:
       MAKE_CANCELLATION_SCENARIO_ID: ${{ vars.MAKE_CANCELLATION_SCENARIO_ID }}
       MAKE_RESCHEDULE_SCENARIO_ID: ${{ vars.MAKE_RESCHEDULE_SCENARIO_ID }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Export and redact provider config
@@ -53,7 +53,7 @@ jobs:
             --target "${{ inputs.target }}" \
             --resource-id-env "${{ inputs.resource_id_env }}" \
             --output "exported/${{ inputs.provider }}-${{ inputs.target }}.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: redacted-${{ inputs.provider }}-${{ inputs.target }}-${{ github.run_id }}
           path: exported/*.json

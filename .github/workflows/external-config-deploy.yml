@@ -38,8 +38,8 @@ jobs:
       MAKE_RESCHEDULE_SCENARIO_ID: ${{ vars.MAKE_RESCHEDULE_SCENARIO_ID }}
       EXTERNAL_CONFIG_DEPLOY_ENABLED: ${{ inputs.dry_run == false && 'true' || 'false' }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Validate selected manifest and target

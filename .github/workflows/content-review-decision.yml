@@ -42,7 +42,7 @@ jobs:
       REVIEWER: ${{ github.actor }}
       REVIEW_RUN_ID: ${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
@@ -51,7 +51,7 @@ jobs:
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -128,7 +128,7 @@ jobs:
           PY
 
       - name: Upload decision receipt
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: successbrand-content-review-decision-${{ github.run_id }}
           path: review-decision.json
