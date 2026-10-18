@@ -40,7 +40,7 @@ jobs:
       GOOGLE_SHEETS_MODE: ${{ vars.GOOGLE_SHEETS_MODE }}
       GOOGLE_SHEETS_SANDBOX_ENABLED: ${{ vars.GOOGLE_SHEETS_SANDBOX_ENABLED }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.TARGET_SHA }}
       - id: auth
@@ -70,7 +70,7 @@ jobs:
             exit 1
           fi
           echo "Google Sheets read-only metadata request succeeded."
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
